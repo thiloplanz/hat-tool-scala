@@ -1,4 +1,4 @@
-// Copyright (c) 2015, Thilo Planz. All rights reserved.
+// Copyright (c) 2015, Thilo Planz.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the Apache License, Version 2.0
@@ -77,8 +77,6 @@ class SSLKeyPinning(trustedDigest: String = null, socketFactory : SSLSocketFacto
   override def checkServerTrusted(chain: Array[X509Certificate], authType: String) {
     val serverCert = chain(0)
     val digest = DigestUtils.sha256Hex(serverCert.getEncoded)
-    println(digest)
-    println(trusted)
     for(t <- trusted){
        if (t.equals(digest)) return;
     }
