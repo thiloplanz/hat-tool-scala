@@ -32,21 +32,40 @@ class NingJsonClientSpec extends Specification{
 
   val client = new NingJsonClient(ning)
 
+  type HttpBinResponse = Map[String, JsonNode]
+
   private def get[T:Manifest](url: String, queryParams : Seq[(String, String)] = Seq.empty) =
-    Await.result(client.get[T](url, queryParams = queryParams), timeout)
+    Await.result(client.get[T](httpBin + url, queryParams = queryParams), timeout)
+
+  private def post[T:Manifest](url: String, entity: Any, queryParams : Seq[(String, String)] = Seq.empty) =
+    Await.result(client.postJson[T](httpBin + url, entity, queryParams = queryParams), timeout)
+
+  private def postText[T:Manifest](url: String, entity: String, queryParams : Seq[(String, String)] = Seq.empty) =
+    Await.result(client.postText[T](httpBin + url, entity, queryParams = queryParams), timeout)
+
+  private def postBytes[T:Manifest](url: String, entity: Array[Byte], queryParams : Seq[(String, String)] = Seq.empty) =
+    Await.result(client.postBytes[T](httpBin + url, entity, queryParams = queryParams), timeout)
+
 
   "NingJsonClient"	>> {
 
-    "can parse JSON" >>  { get[Map[String, JsonNode]](httpBin + "/get").get("args").get.toString must_== "{}" }
+    "can parse JSON" >>  { get[HttpBinResponse]("/get").get("args").get.toString must_== "{}" }
 
-    "can send query parameters" >> { get[Map[String, JsonNode]](httpBin + "/get",
+    "can post JSON" >> { post[HttpBinResponse]("/post", Map("hey" -> "ho")).get("json").get.get("hey").asText must_== "ho" }
+
+    "can post text" >> { postText[HttpBinResponse]("/post", "super'dooper").get("data").get.asText  must_== "super'dooper" }
+
+    "can post bytes" >> { postBytes[HttpBinResponse]("/post", Array[Byte]('a','b','c')).get("data").get.asText must_== "abc" }
+
+
+    "can send query parameters" >> { get[HttpBinResponse]("/get",
       queryParams = Seq("x" -> "y", "x" -> "z", "foo" -> "bar")).get("args").get.toString must_==
         """{"foo":"bar","x":["y","z"]}""" }
 
-    "can return the raw Ning Response" >> { get[Response](httpBin + "/get").getStatusCode must_== 200 }
+    "can return the raw Ning Response" >> { get[Response]( "/get").getStatusCode must_== 200 }
 
     "rejects non-200 status codes" >> {
-      def bad = get[Integer](httpBin + "/status/400")
+      def bad = get[Integer]("/status/400")
 
       bad must throwA[UnsuccessfulRequestException]
     }

@@ -14,7 +14,8 @@
 // You should have received a copy of the License along with this program.
 // If not, see <http://www.apache.org/licenses/LICENSE-2.0>.
 
-import java.io.IOException
+import java.io.{InputStream, IOException}
+import java.nio.charset.Charset
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule
@@ -54,6 +55,36 @@ class NingJsonClient(ning: AsyncHttpClient,
           queryParams: Seq[(String, String)] = Map.empty.toList,
           requestHeaders : RequestHeaders = RequestHeaders.AcceptJson
            ) : Future[T] = executeRequest[T](ning.prepareGet(url), url, queryParams, requestHeaders)
+
+  def postJson[T: Manifest](url: String,
+                            entity: Any,
+                            queryParams: Seq[(String, String)] = Map.empty.toList,
+                            requestHeaders : RequestHeaders = RequestHeaders.SendAndAcceptJson
+                             ): Future[T] =
+    postBytes(url, objectMapper.writeValueAsBytes(entity), queryParams, requestHeaders)
+
+  def postText[T: Manifest](url: String,
+                            entity: String,
+                            queryParams: Seq[(String, String)] = Map.empty.toList,
+                            requestHeaders : RequestHeaders = RequestHeaders.SendTextAcceptJson
+                             ): Future[T] =
+    postBytes[T](url, entity.getBytes(NingJsonClient.UTF8), queryParams, requestHeaders)
+
+
+  def postBytes[T: Manifest](url: String,
+                            entity: Array[Byte],
+                            queryParams: Seq[(String, String)] = Map.empty.toList,
+                            requestHeaders : RequestHeaders = RequestHeaders.SendOctetsAcceptJson
+                             ): Future[T] =
+    executeRequest[T](ning.preparePost(url).setBody(entity), url, queryParams, requestHeaders)
+
+  def postByteStream[T: Manifest](url: String,
+                             entity: InputStream,
+                             queryParams: Seq[(String, String)] = Map.empty.toList,
+                             requestHeaders : RequestHeaders = RequestHeaders.SendOctetsAcceptJson
+                              ): Future[T] =
+    executeRequest[T](ning.preparePost(url).setBody(entity), url, queryParams, requestHeaders)
+
 
 
   private def executeRequest[T: Manifest](request: RequestBuilderBase[_], url: String, queryParams: Seq[(String, String)], requestHeaders : RequestHeaders) = {
@@ -104,6 +135,8 @@ object NingJsonClient {
 
   private val logger = LoggerFactory.getLogger("NingJsonClient")
 
+  private val UTF8 = Charset.forName("UTF-8")
+
 }
 
 
@@ -128,6 +161,10 @@ object RequestHeaders {
   val AcceptJson = None.withAccept("application/json")
 
   val SendAndAcceptJson = AcceptJson.withContentType("application/json")
+
+  val SendTextAcceptJson = AcceptJson.withContentType("text/plain; charset=UTF-8")
+
+  val SendOctetsAcceptJson = AcceptJson.withContentType("application/octet-stream")
 
 }
 
