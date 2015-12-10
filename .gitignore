@@ -1,0 +1,8 @@
+/RUNNING_PID
+/logs/
+/project/
+/target/
+/.idea/
+/src/main/resources/application.conf
+/activator
+/activator-launch-1.3.7.jar
