@@ -32,7 +32,7 @@ trait HatClient{
 
 }
 
-private abstract class HatClientBase(ning: NingJsonClient, host:String) extends HatClient {
+private abstract class HatClientBase extends HatClient {
 
   def get[T:Manifest](path: String, queryParams: Seq[(String, String)] = Seq.empty) : Future[T]
 
@@ -44,7 +44,7 @@ private abstract class HatClientBase(ning: NingJsonClient, host:String) extends 
 
 }
 
-private class HatOwnerClient(ning: NingJsonClient, host:String, name: String, password: String ) extends HatClientBase(ning, host){
+private class HatOwnerClient(ning: NingJsonClient, host:String, name: String, password: String ) extends HatClientBase{
 
   private def passwordParams(name:String, password:String)  = Seq("username"-> name, "password" -> password)
 
