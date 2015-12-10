@@ -1,7 +1,5 @@
 name := "ning-json-client"
 
-version := "1.0"
-
 scalaVersion := "2.11.7"
 
 
@@ -15,8 +13,4 @@ libraryDependencies += "org.slf4j" % "slf4j-simple" % "1.7.12" % "runtime,option
 
 libraryDependencies += "com.ning" % "async-http-client" % "1.9.21"
 
-libraryDependencies += "org.specs2" %% "specs2-core" % "3.6" % "test"
-
-// fix some indirect dependency versions to avoid warnings
-libraryDependencies += "org.scala-lang.modules" %% "scala-parser-combinators" % "1.0.4" % "test"
-libraryDependencies += "org.scala-lang.modules" %% "scala-xml" % "1.0.4" % "test"
+libraryDependencies += "org.specs2" %% "specs2-core" % "3.6.6" % "test"
