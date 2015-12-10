@@ -18,11 +18,13 @@
 package hatTool
 
 import com.fasterxml.jackson.databind.{SerializationFeature, ObjectMapper}
+import com.fasterxml.jackson.module.scala.DefaultScalaModule
+import com.fasterxml.jackson.module.scala.experimental.ScalaObjectMapper
 import com.ning.http.client.AsyncHttpClient
 import com.typesafe.config.ConfigFactory
 import org.rogach.scallop.{ScallopConf, Subcommand}
 
-import scala.concurrent.Await
+import scala.concurrent.{Future, Await}
 import scala.concurrent.duration.Duration
 
 object Main {
@@ -35,20 +37,33 @@ object Main {
   private val ownerPassword = config.getString("hat.owner.password")
 
 
+  private val mapper =  new ObjectMapper with ScalaObjectMapper
+  mapper.registerModule(DefaultScalaModule)
+  mapper.enable(SerializationFeature.INDENT_OUTPUT);
+
+
+  def dumpJson(json: Future[Any]) = println(mapper.writeValueAsString(
+    Await.result(json, Duration("10 seconds"))))
+
 
   def main(args: Array[String]) {
 
     lazy val ning = new AsyncHttpClient()
     lazy val client = HatClient.forOwner(new NingJsonClient(ning), host, owner, ownerPassword)
 
-    val mapper = new ObjectMapper();
-    mapper.enable(SerializationFeature.INDENT_OUTPUT);
 
     object Args extends ScallopConf(args){
       val listDataSources = new Subcommand("listDataSources") with Runnable{
         val dummy = opt[String]()  // weird Scallop parser workaround
-        override def run() = println(mapper.writeValueAsString(
-            Await.result(client.listDataSources(), Duration("10 seconds"))))
+        override def run() = dumpJson(client.listDataSources)
+      }
+      val listDataTables = new Subcommand("describeDataTable") with Runnable{
+        val id = trailArg[Int]()
+        override def run() = dumpJson(client.describeDataTable(id()))
+      }
+      val dumpTable = new Subcommand("dumpDataTable") with Runnable{
+        val id = trailArg[Int]()
+        override def run() = dumpJson(client.dumpDataTable(id()))
       }
     }
 
