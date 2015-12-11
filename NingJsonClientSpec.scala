@@ -34,8 +34,8 @@ class NingJsonClientSpec extends Specification{
 
   type HttpBinResponse = Map[String, JsonNode]
 
-  private def get[T:Manifest](url: String, queryParams : Seq[(String, String)] = Seq.empty) =
-    Await.result(client.get[T](httpBin + url, queryParams = queryParams), timeout)
+  private def get[T:Manifest](url: String, queryParams : Seq[(String, String)] = Seq.empty, okayStatusCode: Int = 200) =
+    Await.result(client.get[T](httpBin + url, queryParams = queryParams, okayStatusCode=okayStatusCode), timeout)
 
   private def post[T:Manifest](url: String, entity: Any, queryParams : Seq[(String, String)] = Seq.empty) =
     Await.result(client.postJson[T](httpBin + url, entity, queryParams = queryParams), timeout)
@@ -69,6 +69,8 @@ class NingJsonClientSpec extends Specification{
 
       bad must throwA[UnsuccessfulRequestException]
     }
+
+    "can accept an alternative status code" >> { get[Response]("/status/201", okayStatusCode = 201).getStatusCode must_== 201 }
   }
 
 
