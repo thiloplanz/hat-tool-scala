@@ -56,43 +56,51 @@ class NingJsonClient(ning: AsyncHttpClient,
                      objectMapper: ObjectMapper with ScalaObjectMapper = NingJsonClient.defaultObjectMapper,
                      logger : Logger = NingJsonClient.logger) {
 
-  def get[T: Manifest](url: String,
-          queryParams: Seq[(String, String)] = Map.empty.toList,
-          requestHeaders : RequestHeaders = RequestHeaders.AcceptJson
-           ) : Future[T] = executeRequest[T](ning.prepareGet(url), url, queryParams, requestHeaders)
+  def get[T: Manifest](url: String, 
+                       queryParams: Seq[(String, String)] = Map.empty.toList, 
+                       requestHeaders : RequestHeaders = RequestHeaders.AcceptJson, 
+                       okayStatusCode: Int = 200
+           ) : Future[T] = executeRequest[T](ning.prepareGet(url), url, queryParams, requestHeaders, okayStatusCode)
 
   def postJson[T: Manifest](url: String,
                             entity: Any,
                             queryParams: Seq[(String, String)] = Map.empty.toList,
-                            requestHeaders : RequestHeaders = RequestHeaders.SendAndAcceptJson
+                            requestHeaders : RequestHeaders = RequestHeaders.SendAndAcceptJson,
+                            okayStatusCode: Int = 200
                              ): Future[T] =
-    postBytes(url, objectMapper.writeValueAsBytes(entity), queryParams, requestHeaders)
+    postBytes(url, objectMapper.writeValueAsBytes(entity), queryParams, requestHeaders, okayStatusCode)
 
   def postText[T: Manifest](url: String,
                             entity: String,
                             queryParams: Seq[(String, String)] = Map.empty.toList,
-                            requestHeaders : RequestHeaders = RequestHeaders.SendTextAcceptJson
+                            requestHeaders : RequestHeaders = RequestHeaders.SendTextAcceptJson,
+                            okayStatusCode: Int = 200
                              ): Future[T] =
-    postBytes[T](url, entity.getBytes(NingJsonClient.UTF8), queryParams, requestHeaders)
+    postBytes[T](url, entity.getBytes(NingJsonClient.UTF8), queryParams, requestHeaders, okayStatusCode)
 
 
   def postBytes[T: Manifest](url: String,
                             entity: Array[Byte],
                             queryParams: Seq[(String, String)] = Map.empty.toList,
-                            requestHeaders : RequestHeaders = RequestHeaders.SendOctetsAcceptJson
+                            requestHeaders : RequestHeaders = RequestHeaders.SendOctetsAcceptJson,
+                            okayStatusCode: Int = 200
                              ): Future[T] =
-    executeRequest[T](ning.preparePost(url).setBody(entity), url, queryParams, requestHeaders)
+    executeRequest[T](ning.preparePost(url).setBody(entity), url, queryParams, requestHeaders, okayStatusCode)
 
   def postByteStream[T: Manifest](url: String,
-                             entity: InputStream,
-                             queryParams: Seq[(String, String)] = Map.empty.toList,
-                             requestHeaders : RequestHeaders = RequestHeaders.SendOctetsAcceptJson
+                                  entity: InputStream, 
+                                  queryParams: Seq[(String, String)] = Map.empty.toList, 
+                                  requestHeaders : RequestHeaders = RequestHeaders.SendOctetsAcceptJson, 
+                                  okayStatusCode: Int = 200
                               ): Future[T] =
-    executeRequest[T](ning.preparePost(url).setBody(entity), url, queryParams, requestHeaders)
+    executeRequest[T](ning.preparePost(url).setBody(entity), url, queryParams, requestHeaders, okayStatusCode)
 
 
 
-  private def executeRequest[T: Manifest](request: RequestBuilderBase[_], url: String, queryParams: Seq[(String, String)], requestHeaders : RequestHeaders) = {
+  private def executeRequest[T: Manifest](request: RequestBuilderBase[_],
+                                          url: String, queryParams: Seq[(String, String)],
+                                          requestHeaders : RequestHeaders,
+                                          okayStatusCode: Int) = {
     queryParams.foreach { case (name, value) => request.addQueryParam(name, value) }
     requestHeaders.headers.foreach { case (name, value) => request.addHeader(name, value)}
 
@@ -105,9 +113,11 @@ class NingJsonClient(ning: AsyncHttpClient,
             result.success(response.asInstanceOf[T])
             return
           }
-          // otherwise we require status 200 OK
+          // otherwise we require the expected status code (default: 200 OK)
           val status = HttpStatus(response.getStatusCode, response.getStatusText, url, queryParams)
-          if (status.statusCode != 200){
+          if (status.statusCode != okayStatusCode){
+            // TODO:  use Either[GoodResult, BadResult] to get error response back
+            logger.warn(response.getResponseBody("UTF-8"))
             result.failure(new UnsuccessfulRequestException(status))
             return
           }

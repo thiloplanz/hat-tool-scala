@@ -17,15 +17,18 @@
 
 package hatTool
 
-import com.fasterxml.jackson.databind.{SerializationFeature, ObjectMapper}
+import java.io.File
+
+import com.fasterxml.jackson.databind.node.ObjectNode
+import com.fasterxml.jackson.databind.{ObjectMapper, SerializationFeature}
 import com.fasterxml.jackson.module.scala.DefaultScalaModule
 import com.fasterxml.jackson.module.scala.experimental.ScalaObjectMapper
 import com.ning.http.client.AsyncHttpClient
 import com.typesafe.config.ConfigFactory
 import org.rogach.scallop.{ScallopConf, Subcommand}
 
-import scala.concurrent.{Future, Await}
 import scala.concurrent.duration.Duration
+import scala.concurrent.{Await, Future}
 
 object Main {
 
@@ -42,9 +45,11 @@ object Main {
   mapper.enable(SerializationFeature.INDENT_OUTPUT);
 
 
-  def dumpJson(json: Future[Any]) = println(mapper.writeValueAsString(
-    Await.result(json, Duration("10 seconds"))))
-
+  def dumpJson(json: Future[Any]) = try {
+    println(mapper.writeValueAsString(Await.result(json, Duration("10 seconds"))))
+  } catch {
+    case e: UnsuccessfulRequestException => println(e.toString)
+  }
 
   def main(args: Array[String]) {
 
@@ -61,9 +66,13 @@ object Main {
         val id = trailArg[Int]()
         override def run() = dumpJson(client.describeDataTable(id()))
       }
-      val dumpTable = new Subcommand("dumpDataTable") with Runnable{
+      val dumpDataTable = new Subcommand("dumpDataTable") with Runnable{
         val id = trailArg[Int]()
         override def run() = dumpJson(client.dumpDataTable(id()))
+      }
+      val createDataTable = new Subcommand("createDataTable") with Runnable {
+        val definition = trailArg[String]()
+        override def run() = _createDataTable(client, definition())
       }
     }
 
@@ -77,6 +86,11 @@ object Main {
       ning.close()
     }
 
+  }
+
+  private def _createDataTable(client: HatClient, fileName: String): Unit ={
+    val definition = mapper.readValue[ObjectNode](new File(fileName))
+    dumpJson(client.createDataTable(definition))
   }
 
 }

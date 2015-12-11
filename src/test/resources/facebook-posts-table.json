@@ -1,0 +1,19 @@
+{
+  "name": "posts",
+  "source": "facebook",
+  "fields": [
+    { "name": "id" },
+    { "name": "caption" },
+    { "name": "created_time" },
+    { "name": "description" },
+    { "name": "link" },
+    { "name": "message" },
+    { "name": "name" },
+    { "name": "object_id" },
+    { "name": "picture" },
+    { "name": "status_type" },
+    { "name": "story" },
+    { "name": "type" },
+    { "name": "updated_time" }
+  ]
+}

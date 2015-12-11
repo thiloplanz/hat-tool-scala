@@ -24,32 +24,45 @@ trait HatClient{
 
   // TODO: prepare proper Scala classes to return instead of raw JSON nodes
 
-  def listDataSources() : Future[Seq[ObjectNode]]
+  type HatDataTable = ObjectNode
+  type HatDataSource = ObjectNode
+  type HatDataTableValues = ObjectNode
 
-  def describeDataTable(id:Int): Future[ObjectNode]
+  def listDataSources() : Future[Seq[HatDataSource]]
 
-  def dumpDataTable(id:Int): Future[Seq[ObjectNode]]
+  def describeDataTable(id:Int): Future[HatDataTable]
+
+  def dumpDataTable(id:Int): Future[Seq[HatDataTableValues]]
+
+  def createDataTable(definition: HatDataTable): Future[HatDataTable]
 
 }
 
 private abstract class HatClientBase extends HatClient {
 
-  def get[T:Manifest](path: String, queryParams: Seq[(String, String)] = Seq.empty) : Future[T]
+  def get[T:Manifest](path: String) : Future[T]
 
-  override def listDataSources() = get[Seq[ObjectNode]]("data/sources")
+  def post[T:Manifest](path: String, entity: Any, okayStatusCode: Int = 200) : Future[T]
 
-  override def describeDataTable(id: Int) = get[ObjectNode]("data/table/"+id)
+  override def listDataSources() = get[Seq[HatDataSource]]("data/sources")
 
-  override def dumpDataTable(id: Int) = get[Seq[ObjectNode]]("data/table/"+id+"/values")
+  override def describeDataTable(id: Int) = get[HatDataTable]("data/table/"+id)
+
+  override def dumpDataTable(id: Int) = get[Seq[HatDataTableValues]]("data/table/"+id+"/values")
+
+  override def createDataTable(definition: HatDataTable) = post[HatDataTable]("data/table", definition, okayStatusCode = 201)
 
 }
 
 private class HatOwnerClient(ning: NingJsonClient, host:String, name: String, password: String ) extends HatClientBase{
 
-  private def passwordParams(name:String, password:String)  = Seq("username"-> name, "password" -> password)
+  private val passwordParams  = Seq("username"-> name, "password" -> password)
 
-  override def get[T:Manifest](path: String, queryParams: Seq[(String, String)] = Seq.empty) =
-    ning.get[T](host + path, queryParams = queryParams ++ passwordParams(name, password))
+  override def get[T:Manifest](path: String) =
+    ning.get[T](host + path, queryParams = passwordParams)
+
+  override def post[T:Manifest](path: String, entity: Any, okayStatusCode: Int = 200) =
+    ning.postJson[T](host+path, entity, queryParams = passwordParams, okayStatusCode = okayStatusCode)
 
 }
 
