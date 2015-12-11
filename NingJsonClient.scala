@@ -90,6 +90,39 @@ class NingJsonClient(ning: AsyncHttpClient,
                               ): Future[T] =
     executeRequest[T](ning.preparePost(url).setBody(entity), url, queryParams, requestHeaders, okayStatusCode)
 
+  def putJson[T: Manifest](url: String,
+                            entity: Any,
+                            queryParams: Seq[(String, String)] = Map.empty.toList,
+                            requestHeaders : RequestHeaders = RequestHeaders.SendAndAcceptJson,
+                            okayStatusCode: Int = 200
+                             ): Future[T] =
+    putBytes(url, objectMapper.writeValueAsBytes(entity), queryParams, requestHeaders, okayStatusCode)
+
+  def putText[T: Manifest](url: String,
+                            entity: String,
+                            queryParams: Seq[(String, String)] = Map.empty.toList,
+                            requestHeaders : RequestHeaders = RequestHeaders.SendTextAcceptJson,
+                            okayStatusCode: Int = 200
+                             ): Future[T] =
+    putBytes[T](url, entity.getBytes(NingJsonClient.UTF8), queryParams, requestHeaders, okayStatusCode)
+
+
+  def putBytes[T: Manifest](url: String,
+                             entity: Array[Byte],
+                             queryParams: Seq[(String, String)] = Map.empty.toList,
+                             requestHeaders : RequestHeaders = RequestHeaders.SendOctetsAcceptJson,
+                             okayStatusCode: Int = 200
+                              ): Future[T] =
+    executeRequest[T](ning.preparePut(url).setBody(entity), url, queryParams, requestHeaders, okayStatusCode)
+
+  def putByteStream[T: Manifest](url: String,
+                                  entity: InputStream,
+                                  queryParams: Seq[(String, String)] = Map.empty.toList,
+                                  requestHeaders : RequestHeaders = RequestHeaders.SendOctetsAcceptJson,
+                                  okayStatusCode: Int = 200
+                                   ): Future[T] =
+    executeRequest[T](ning.preparePut(url).setBody(entity), url, queryParams, requestHeaders, okayStatusCode)
+
 
 
   private def executeRequest[T: Manifest](request: RequestBuilderBase[_],
