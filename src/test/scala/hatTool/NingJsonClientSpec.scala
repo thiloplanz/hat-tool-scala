@@ -48,6 +48,15 @@ class NingJsonClientSpec extends Specification{
   private def postBytes[T:Manifest](url: String, entity: Array[Byte], queryParams : Seq[(String, String)] = Seq.empty) =
     Await.result(client.postBytes[T](httpBin + url, entity, queryParams = queryParams), timeout)
 
+  private def put[T:Manifest](url: String, entity: Any, queryParams : Seq[(String, String)] = Seq.empty) =
+    Await.result(client.putJson[T](httpBin + url, entity, queryParams = queryParams), timeout)
+
+  private def putText[T:Manifest](url: String, entity: String, queryParams : Seq[(String, String)] = Seq.empty) =
+    Await.result(client.putText[T](httpBin + url, entity, queryParams = queryParams), timeout)
+
+  private def putBytes[T:Manifest](url: String, entity: Array[Byte], queryParams : Seq[(String, String)] = Seq.empty) =
+    Await.result(client.putBytes[T](httpBin + url, entity, queryParams = queryParams), timeout)
+
 
   "NingJsonClient"	>> {
 
@@ -58,6 +67,12 @@ class NingJsonClientSpec extends Specification{
     "can post text" >> { postText[HttpBinResponse]("/post", "super'dooper").get("data").get.asText  must_== "super'dooper" }
 
     "can post bytes" >> { postBytes[HttpBinResponse]("/post", Array[Byte]('a','b','c')).get("data").get.asText must_== "abc" }
+
+    "can put JSON" >> { put[HttpBinResponse]("/put", Map("hey" -> "ho")).get("json").get.get("hey").asText must_== "ho" }
+
+    "can put text" >> { putText[HttpBinResponse]("/put", "super'dooper").get("data").get.asText  must_== "super'dooper" }
+
+    "can put bytes" >> { putBytes[HttpBinResponse]("/put", Array[Byte]('a','b','c')).get("data").get.asText must_== "abc" }
 
 
     "can send query parameters" >> { get[HttpBinResponse]("/get",
@@ -73,6 +88,7 @@ class NingJsonClientSpec extends Specification{
     }
 
     "can accept an alternative status code" >> { get[Response]("/status/201", okayStatusCode = 201).getStatusCode must_== 201 }
+
   }
 
 

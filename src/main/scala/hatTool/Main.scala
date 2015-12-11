@@ -18,6 +18,7 @@
 package hatTool
 
 import java.io.File
+import java.util.Date
 
 import com.fasterxml.jackson.databind.node.ObjectNode
 import com.fasterxml.jackson.databind.{ObjectMapper, SerializationFeature}
@@ -74,6 +75,31 @@ object Main {
       val createDataTable = new Subcommand("createDataTable") with Runnable {
         val definition = trailArg[String]()
         override def run() = _createDataTable(client, definition())
+      }
+      val createBundle = new Subcommand("createBundle") with Runnable {
+        val table = opt[Int]()
+        val name = trailArg[String]()
+        override def run() =  dumpJson(client.createContextlessBundle(name(), table()))
+      }
+      val proposeDataDebit = new Subcommand("proposeDataDebit") with Runnable {
+        val table = opt[Int]()
+        val name = trailArg[String]()
+
+        override def run() = dumpJson(client.proposeDataDebit(name(), new HatContextLessBundle(name(), table()),
+          startDate = new Date()
+        ))
+      }
+      val enableDataDebit = new Subcommand("enableDataDebit") with Runnable {
+        val key = trailArg[String]()
+        override def run() = dumpJson(client.enableDataDebit(key()));
+      }
+      val disableDataDebit = new Subcommand("disableDataDebit") with Runnable {
+        val key = trailArg[String]()
+        override def run() = dumpJson(client.disableDataDebit(key()));
+      }
+      val dumpDataDebitValues = new Subcommand("dumpDataDebitValues") with Runnable {
+        val key = trailArg[String]()
+        override def run() = dumpJson(client.dumpDataDebitValues(key()));
       }
       val rawPost = new Subcommand("POST") with Runnable {
         val path = trailArg[String]()

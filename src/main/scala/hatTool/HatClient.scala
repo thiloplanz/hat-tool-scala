@@ -16,8 +16,14 @@
 
 package hatTool
 
+import java.time.format.DateTimeFormatter
+import java.time.{Duration, ZoneId}
+import java.util.Date
+
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.node.ObjectNode
+import com.ning.http.client.Response
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -28,52 +34,140 @@ trait HatClient{
   type HatDataTable = ObjectNode
   type HatDataSource = ObjectNode
   type HatDataTableValues = ObjectNode
+  type HatDataDebit = ObjectNode
 
   def listDataSources() : Future[Seq[HatDataSource]]
 
   def describeDataTable(id:Int): Future[HatDataTable]
 
+  def getDataTableName(id:Int): Future[HatDataTableName]
+
   def dumpDataTable(id:Int): Future[Seq[HatDataTableValues]]
 
   def createDataTable(definition: HatDataTable): Future[HatDataTable]
+
+  def createContextlessBundle(name: String, tableId: Int): Future[JsonNode]
+
+  def proposeDataDebit(name: String,
+                       bundle: HatBundleDefinition,
+                       startDate: Date = new Date(),
+                       validity: Duration = Duration.ofDays(3650),
+                       rolling: Boolean = false,
+                       sell: Boolean = false,
+                       price: Float = 0
+                       ) : Future[HatDataDebit]
+
+  def enableDataDebit(key: String) : Future[String]
+
+  def disableDataDebit(key: String) : Future[String]
+
+  def dumpDataDebitValues(key: String): Future[JsonNode]
 
   def rawPost(path: String, entity: JsonNode): Future[JsonNode]
 
 }
 
-private abstract class HatClientBase(implicit val ec: ExecutionContext) extends HatClient {
+trait HatBundleDefinition{
+   def name: String
+   def kind: String
+   def payload(client:HatClient)(implicit ec: ExecutionContext) : Future[(String, Map[_,_])]
+}
 
-  def get[T:Manifest](path: String, queryParams: Seq[(String, String)] = Map.empty.toList) : Future[T]
+case class HatContextLessBundle(name: String, tableId: Int) extends HatBundleDefinition {
+  val kind = "contextless"
+  def payload(client:HatClient)(implicit ec: ExecutionContext) = client.getDataTableName(tableId).map { tableInfo =>
+    "bundleContextless" -> Map("name" -> name, "tables" -> table(tableInfo))
+  }
+  def table(tableInfo: HatDataTableName) = Seq(
+    Map("name" -> name, "bundleTable" ->
+      Map("name" -> name, "table"-> Map("id" -> tableId, "name" -> tableInfo.name, "source" -> tableInfo.source))))
+}
 
-  def post[T:Manifest](path: String, entity: Any, okayStatusCode: Int = 200) : Future[T]
+@JsonIgnoreProperties(ignoreUnknown = true)
+case class HatDataTableName(
+                       name: String,
+                       source: String,
+                       id: Int
+                         )
+
+
+private abstract class HatClientBase(ning: NingJsonClient, host: String, extraQueryParams: Seq[(String, String)])(implicit val ec: ExecutionContext) extends HatClient {
+
+  def get[T:Manifest](path: String, queryParams: Seq[(String, String)] = Map.empty.toList)  =
+    ning.get[T](host + path, queryParams = extraQueryParams ++ queryParams)
+
+  def post[T:Manifest](path: String, entity: Any, okayStatusCode: Int = 200) =
+    ning.postJson[T](host+path, entity, queryParams = extraQueryParams, okayStatusCode = okayStatusCode)
+
+  def put[T:Manifest](path: String, entity: Any, okayStatusCode: Int = 200) =
+    ning.putJson[T](host+path, entity, queryParams = extraQueryParams, okayStatusCode = okayStatusCode)
+
+
+  private val compactISO8601WithoutMilliSeconds = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ssZ").withZone(ZoneId.systemDefault)
 
   override def listDataSources() = get[Seq[HatDataSource]]("data/sources")
 
   override def describeDataTable(id: Int) = get[HatDataTable]("data/table/"+id)
 
+  override def getDataTableName(id: Int) = get[HatDataTableName]("data/table/"+id)
+
   override def dumpDataTable(id: Int) = get[Seq[HatDataTableValues]]("data/table/"+id+"/values")
 
-  override def createDataTable(definition: HatDataTable) = post[HatDataTable]("data/table", definition, okayStatusCode = 201)
+  override def createDataTable(definition: ObjectNode) = post[HatDataTable]("data/table", definition, okayStatusCode = 201)
+
+  override def createContextlessBundle(name: String, tableId: Int) = {
+    // first we need the table information
+    getDataTableName(tableId).flatMap { tableInfo =>
+      post[JsonNode]("bundles/contextless",
+        Map("name" -> name, "tables" -> HatContextLessBundle(name, tableId).table(tableInfo)),
+        okayStatusCode = 201)
+    }
+  }
+
+  override def proposeDataDebit(name: String,
+                                bundle: HatBundleDefinition,
+                                startDate: Date = new Date(),
+                                validity: Duration = Duration.ofDays(3650),
+                                rolling: Boolean = false,
+                                sell: Boolean = false,
+                                price: Float = 0
+                                 ) =
+    bundle.payload(this).flatMap { payload =>
+      post[HatDataDebit]("dataDebit/propose", Map(
+      "name" -> name,
+      "kind" -> bundle.kind,
+      "startDate" -> compactISO8601WithoutMilliSeconds.format(startDate.toInstant),
+      "endDate" -> compactISO8601WithoutMilliSeconds.format(startDate.toInstant.plus(validity)),
+      "rolling" -> false,
+      "sell" -> true,
+      "price" -> price,
+       payload
+      ), okayStatusCode = 201)
+    }
+
+  override def enableDataDebit(key: String) = put[Response]("dataDebit/"+key+"/enable", true).map { response =>
+    if (response.getStatusCode != 200) throw new UnsuccessfulRequestException(HttpStatus(response.getStatusCode, response.getStatusText, "dataDebit/"+key+"/enable", Seq.empty))
+    response.getResponseBody("UTF-8")
+  }
+
+  override def disableDataDebit(key: String) = put[Response]("dataDebit/"+key+"/disable", false).map { response =>
+    if (response.getStatusCode != 200) throw new UnsuccessfulRequestException(HttpStatus(response.getStatusCode, response.getStatusText, "dataDebit/"+key+"/disable", Seq.empty))
+    response.getResponseBody("UTF-8")
+  }
+
+  override def dumpDataDebitValues(key: String) = get[JsonNode]("dataDebit/"+key+"/values")
 
   override def rawPost(path: String, entity: JsonNode) = post[JsonNode](path, entity)
 
 }
 
-private class HatOwnerClient(ning: NingJsonClient, host:String, name: String, password: String, ec: ExecutionContext) extends HatClientBase()(ec){
-
-  private val passwordParams  = Seq("username"-> name, "password" -> password)
-
-  override def get[T:Manifest](path: String, queryParams: Seq[(String, String)] = Map.empty.toList) =
-    ning.get[T](host + path, queryParams = passwordParams ++ queryParams)
-
-  override def post[T:Manifest](path: String, entity: Any, okayStatusCode: Int = 200) =
-    ning.postJson[T](host+path, entity, queryParams = passwordParams, okayStatusCode = okayStatusCode)
-
-}
+private class HatOwnerClient(ning: NingJsonClient, host:String, name: String, password: String, ec: ExecutionContext)
+  extends HatClientBase(ning, host, Seq("username"-> name, "password" -> password))(ec)
 
 
 object HatClient {
 
-  def forOwner(ning: NingJsonClient, host: String, name: String, password: String)(implicit ec: ExecutionContext) : HatClient = new HatOwnerClient(ning, host, name, password, ec)
+  def forOwner(ning: NingJsonClient, host: String, name: String, password: String)(implicit ec: ExecutionContext) : HatClient
+  = new HatOwnerClient(ning, host, name, password, ec)
 
 }
