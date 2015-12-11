@@ -1,0 +1,18 @@
+{
+  "record":
+  {
+    "name": "a post"
+  },
+  "values":
+  [
+    {
+      "field":
+      {
+        "id": 83,
+        "name": "not a message",
+        "tableId": 24
+      },
+      "value": "Hey, it is very tricky to get data into HAT with a raw POST. A nicer tool is definitely a TODO. Should be able to work with 'normal' JSON or CSV"
+    }
+  ]
+}

@@ -16,9 +16,10 @@
 
 package hatTool
 
+import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.node.ObjectNode
 
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future}
 
 trait HatClient{
 
@@ -36,11 +37,13 @@ trait HatClient{
 
   def createDataTable(definition: HatDataTable): Future[HatDataTable]
 
+  def rawPost(path: String, entity: JsonNode): Future[JsonNode]
+
 }
 
-private abstract class HatClientBase extends HatClient {
+private abstract class HatClientBase(implicit val ec: ExecutionContext) extends HatClient {
 
-  def get[T:Manifest](path: String) : Future[T]
+  def get[T:Manifest](path: String, queryParams: Seq[(String, String)] = Map.empty.toList) : Future[T]
 
   def post[T:Manifest](path: String, entity: Any, okayStatusCode: Int = 200) : Future[T]
 
@@ -52,14 +55,16 @@ private abstract class HatClientBase extends HatClient {
 
   override def createDataTable(definition: HatDataTable) = post[HatDataTable]("data/table", definition, okayStatusCode = 201)
 
+  override def rawPost(path: String, entity: JsonNode) = post[JsonNode](path, entity)
+
 }
 
-private class HatOwnerClient(ning: NingJsonClient, host:String, name: String, password: String ) extends HatClientBase{
+private class HatOwnerClient(ning: NingJsonClient, host:String, name: String, password: String, ec: ExecutionContext) extends HatClientBase()(ec){
 
   private val passwordParams  = Seq("username"-> name, "password" -> password)
 
-  override def get[T:Manifest](path: String) =
-    ning.get[T](host + path, queryParams = passwordParams)
+  override def get[T:Manifest](path: String, queryParams: Seq[(String, String)] = Map.empty.toList) =
+    ning.get[T](host + path, queryParams = passwordParams ++ queryParams)
 
   override def post[T:Manifest](path: String, entity: Any, okayStatusCode: Int = 200) =
     ning.postJson[T](host+path, entity, queryParams = passwordParams, okayStatusCode = okayStatusCode)
@@ -69,6 +74,6 @@ private class HatOwnerClient(ning: NingJsonClient, host:String, name: String, pa
 
 object HatClient {
 
-  def forOwner(ning: NingJsonClient, host: String, name: String, password: String) : HatClient = new HatOwnerClient(ning, host, name, password)
+  def forOwner(ning: NingJsonClient, host: String, name: String, password: String)(implicit ec: ExecutionContext) : HatClient = new HatOwnerClient(ning, host, name, password, ec)
 
 }

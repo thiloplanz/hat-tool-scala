@@ -29,6 +29,7 @@ import org.rogach.scallop.{ScallopConf, Subcommand}
 
 import scala.concurrent.duration.Duration
 import scala.concurrent.{Await, Future}
+import scala.concurrent.ExecutionContext.Implicits.global
 
 object Main {
 
@@ -62,7 +63,7 @@ object Main {
         val dummy = opt[String]()  // weird Scallop parser workaround
         override def run() = dumpJson(client.listDataSources)
       }
-      val listDataTables = new Subcommand("describeDataTable") with Runnable{
+      val describeDataTable = new Subcommand("describeDataTable") with Runnable{
         val id = trailArg[Int]()
         override def run() = dumpJson(client.describeDataTable(id()))
       }
@@ -73,6 +74,11 @@ object Main {
       val createDataTable = new Subcommand("createDataTable") with Runnable {
         val definition = trailArg[String]()
         override def run() = _createDataTable(client, definition())
+      }
+      val rawPost = new Subcommand("POST") with Runnable {
+        val path = trailArg[String]()
+        val rawJson = trailArg[String]()
+        override def run() = _rawPost(client, path(), rawJson())
       }
     }
 
@@ -91,6 +97,11 @@ object Main {
   private def _createDataTable(client: HatClient, fileName: String): Unit ={
     val definition = mapper.readValue[ObjectNode](new File(fileName))
     dumpJson(client.createDataTable(definition))
+  }
+
+  private def _rawPost(client: HatClient, path: String, fileName: String): Unit = {
+    val entity = mapper.readValue[ObjectNode](new File(fileName))
+    dumpJson(client.rawPost(path, entity))
   }
 
 }
