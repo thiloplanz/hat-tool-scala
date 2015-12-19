@@ -36,6 +36,10 @@ trait HatClient{
   type HatDataTableValues = ObjectNode
   type HatDataDebit = ObjectNode
   type HatEntity = ObjectNode
+  type HatProperty = ObjectNode
+  type HatPropertyType = ObjectNode
+  type HatUnitOfMeasurement = ObjectNode
+
 
   def listDataSources() : Future[Seq[HatDataSource]]
 
@@ -49,7 +53,25 @@ trait HatClient{
 
   def listEvents() : Future[Seq[HatEntity]]
 
+  def listProperties() : Future[Seq[HatProperty]]
+
+  def listPropertyTypes() : Future[Seq[HatPropertyType]]
+
+  def listUnitsOfMeasurement() : Future[Seq[HatUnitOfMeasurement]]
+
   def describeDataTable(id:Int): Future[HatDataTable]
+
+  def describeProperty(id: Int): Future[HatProperty]
+
+  def describeProperty(name: String): Future[HatProperty]
+
+  def describePropertyType(id: Int): Future[HatPropertyType]
+
+  def describePropertyType(name: String): Future[HatPropertyType]
+
+  def describeUnitOfMeasurement(id: Int): Future[HatUnitOfMeasurement]
+
+  def describeUnitOfMeasurement(name: String): Future[HatUnitOfMeasurement]
 
   def getDataTableName(id:Int): Future[HatDataTableName]
 
@@ -138,7 +160,47 @@ private abstract class HatClientBase(ning: NingJsonClient, host: String, extraQu
 
   override def listOrganizations() = get[Seq[HatEntity]]("organisation")
 
+  override def listProperties() = get[Seq[HatProperty]]("property")
+
+  override def listPropertyTypes() = get[Seq[HatPropertyType]]("type/type")
+
+  override def listUnitsOfMeasurement() = get[Seq[HatUnitOfMeasurement]]("type/unitofmeasurement")
+
   override def describeDataTable(id: Int) = get[HatDataTable]("data/table/"+id)
+
+  override def describeProperty(id: Int) = get[HatProperty]("property/"+id)
+
+  override def describeProperty(name: String) = get[Seq[HatProperty]]("property", queryParams = Seq("name" -> name)).map {
+    case Seq() => throw new IllegalArgumentException(s"there is no property called '${name}'")
+    case Seq(one) => one
+    case many => throw new IllegalArgumentException(s"there are ${many.size} properties called '${name}'")
+  }
+
+  // there is no get by ID endpoint
+  override def describePropertyType(id: Int) = listPropertyTypes().map { _.filter { _.get("id").asInt == id} match {
+    case Seq() => throw new IllegalArgumentException(s"there is no property type with id ${id}")
+    case Seq(one) => one
+    case many => throw new IllegalArgumentException(s"there are ${many.size} property types with id ${id}")
+  }}
+
+  override def describePropertyType(name: String) = get[Seq[HatProperty]]("type/type", queryParams = Seq("name" -> name)).map {
+    case Seq() => throw new IllegalArgumentException(s"there is no property type called '${name}'")
+    case Seq(one) => one
+    case many => throw new IllegalArgumentException(s"there are ${many.size} properties types called '${name}'")
+  }
+
+  // there is no get by ID endpoint
+  override def describeUnitOfMeasurement(id: Int) = listUnitsOfMeasurement().map { _.filter { _.get("id").asInt == id} match {
+    case Seq() => throw new IllegalArgumentException(s"there is no unit with id ${id}")
+    case Seq(one) => one
+    case many => throw new IllegalArgumentException(s"there are ${many.size} units with id ${id}")
+  }}
+
+  override def describeUnitOfMeasurement(name: String) = get[Seq[HatProperty]]("type/unitofmeasurement", queryParams = Seq("name" -> name)).map {
+    case Seq() => throw new IllegalArgumentException(s"there is no unit called '${name}'")
+    case Seq(one) => one
+    case many => throw new IllegalArgumentException(s"there are ${many.size} units called '${name}'")
+  }
 
   override def getDataTableName(id: Int) = get[HatDataTableName]("data/table/"+id)
 

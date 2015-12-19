@@ -29,9 +29,9 @@ import com.ning.http.client.AsyncHttpClient
 import com.typesafe.config.ConfigFactory
 import org.rogach.scallop.{ScallopConf, Subcommand}
 
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration.Duration
 import scala.concurrent.{Await, Future}
-import scala.concurrent.ExecutionContext.Implicits.global
 
 object Main {
 
@@ -92,10 +92,55 @@ object Main {
         val filter = trailArg[String](required = false)
         override def run() =  checkJsonPointer(filter.get) match { case selector => dumpJson(client.listEvents, selector) }
       }
+      val listProperties = new Subcommand("listProperties") with Runnable{
+        val filter = trailArg[String](required = false)
+        override def run() =  checkJsonPointer(filter.get) match { case selector => dumpJson(client.listProperties, selector) }
+      }
+      val listPropertyTypes = new Subcommand("listPropertyTypes") with Runnable{
+        val filter = trailArg[String](required = false)
+        override def run() =  checkJsonPointer(filter.get) match { case selector => dumpJson(client.listPropertyTypes, selector) }
+      }
+      val listUnitsOfMeasurements = new Subcommand("listUnits") with Runnable{
+        val filter = trailArg[String](required = false)
+        override def run() =  checkJsonPointer(filter.get) match { case selector => dumpJson(client.listUnitsOfMeasurement, selector) }
+      }
       val describeDataTable = new Subcommand("describeDataTable") with Runnable{
         val id = trailArg[Int]()
         val filter = trailArg[String](required = false)
         override def run() =  checkJsonPointer(filter.get) match { case selector => dumpJson(client.describeDataTable(id()), selector) }
+      }
+      val describeProperty = new Subcommand("describeProperty") with Runnable{
+        val id = trailArg[String]()
+        val filter = trailArg[String](required = false)
+        override def run() =  checkJsonPointer(filter.get) match {
+          case selector =>
+            scala.util.control.Exception.allCatch.opt(id().toInt) match {
+              case None => dumpJson(client.describeProperty(id()), selector)
+              case Some(number) => dumpJson(client.describeProperty(number), selector)
+            }
+        }
+      }
+      val describePropertyType = new Subcommand("describePropertyType") with Runnable{
+        val id = trailArg[String]()
+        val filter = trailArg[String](required = false)
+        override def run() =  checkJsonPointer(filter.get) match {
+          case selector =>
+            scala.util.control.Exception.allCatch.opt(id().toInt) match {
+              case None => dumpJson(client.describePropertyType(id()), selector)
+              case Some(number) => dumpJson(client.describePropertyType(number), selector)
+            }
+        }
+      }
+      val describeUnit = new Subcommand("describeUnit") with Runnable{
+        val id = trailArg[String]()
+        val filter = trailArg[String](required = false)
+        override def run() =  checkJsonPointer(filter.get) match {
+          case selector =>
+            scala.util.control.Exception.allCatch.opt(id().toInt) match {
+              case None => dumpJson(client.describeUnitOfMeasurement(id()), selector)
+              case Some(number) => dumpJson(client.describeUnitOfMeasurement(number), selector)
+            }
+        }
       }
       val dumpDataTable = new Subcommand("dumpDataTable") with Runnable{
         val id = trailArg[Int]()
