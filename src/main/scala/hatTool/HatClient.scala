@@ -35,14 +35,35 @@ trait HatClient{
   type HatDataSource = ObjectNode
   type HatDataTableValues = ObjectNode
   type HatDataDebit = ObjectNode
+  type HatEntity = ObjectNode
 
   def listDataSources() : Future[Seq[HatDataSource]]
+
+  def listPersons() : Future[Seq[HatEntity]]
+
+  def listThings() : Future[Seq[HatEntity]]
+
+  def listLocations() : Future[Seq[HatEntity]]
+
+  def listOrganizations() : Future[Seq[HatEntity]]
+
+  def listEvents() : Future[Seq[HatEntity]]
 
   def describeDataTable(id:Int): Future[HatDataTable]
 
   def getDataTableName(id:Int): Future[HatDataTableName]
 
   def dumpDataTable(id:Int): Future[Seq[HatDataTableValues]]
+
+  def getPerson(id:Int): Future[HatEntity]
+
+  def getThing(id:Int): Future[HatEntity]
+
+  def getLocation(id:Int): Future[HatEntity]
+
+  def getOrganization(id:Int): Future[HatEntity]
+
+  def getEvent(id:Int): Future[HatEntity]
 
   def createDataTable(definition: HatDataTable): Future[HatDataTable]
 
@@ -107,11 +128,31 @@ private abstract class HatClientBase(ning: NingJsonClient, host: String, extraQu
 
   override def listDataSources() = get[Seq[HatDataSource]]("data/sources")
 
+  override def listPersons() = get[Seq[HatEntity]]("person")
+
+  override def listThings() = get[Seq[HatEntity]]("thing")
+
+  override def listEvents() = get[Seq[HatEntity]]("event")
+
+  override def listLocations() = get[Seq[HatEntity]]("location")
+
+  override def listOrganizations() = get[Seq[HatEntity]]("organisation")
+
   override def describeDataTable(id: Int) = get[HatDataTable]("data/table/"+id)
 
   override def getDataTableName(id: Int) = get[HatDataTableName]("data/table/"+id)
 
   override def dumpDataTable(id: Int) = get[Seq[HatDataTableValues]]("data/table/"+id+"/values")
+
+  override def getPerson(id: Int) = get[HatEntity]("person/"+id+"/values")
+
+  override def getThing(id: Int) = get[HatEntity]("thing/"+id+"/values")
+
+  override def getLocation(id: Int) = get[HatEntity]("location/"+id+"/values")
+
+  override def getOrganization(id: Int) = get[HatEntity]("organisation/"+id+"/values")
+
+  override def getEvent(id: Int) = get[HatEntity]("event/"+id+"/values")
 
   override def createDataTable(definition: ObjectNode) = post[HatDataTable]("data/table", definition, okayStatusCode = 201)
 

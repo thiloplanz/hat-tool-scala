@@ -64,6 +64,26 @@ object Main {
         val dummy = opt[String]()  // weird Scallop parser workaround
         override def run() = dumpJson(client.listDataSources)
       }
+      val listPersons = new Subcommand("listPersons") with Runnable{
+        val dummy = opt[String]()  // weird Scallop parser workaround
+        override def run() = dumpJson(client.listPersons)
+      }
+      val listThings = new Subcommand("listThings") with Runnable{
+        val dummy = opt[String]()  // weird Scallop parser workaround
+        override def run() = dumpJson(client.listThings)
+      }
+      val listOrgs = new Subcommand("listOrganizations") with Runnable{
+        val dummy = opt[String]()  // weird Scallop parser workaround
+        override def run() = dumpJson(client.listOrganizations())
+      }
+      val listLocations = new Subcommand("listLocations") with Runnable{
+        val dummy = opt[String]()  // weird Scallop parser workaround
+        override def run() = dumpJson(client.listLocations)
+      }
+      val listEvents = new Subcommand("listEvents") with Runnable{
+        val dummy = opt[String]()  // weird Scallop parser workaround
+        override def run() = dumpJson(client.listEvents)
+      }
       val describeDataTable = new Subcommand("describeDataTable") with Runnable{
         val id = trailArg[Int]()
         override def run() = dumpJson(client.describeDataTable(id()))
@@ -71,6 +91,26 @@ object Main {
       val dumpDataTable = new Subcommand("dumpDataTable") with Runnable{
         val id = trailArg[Int]()
         override def run() = dumpJson(client.dumpDataTable(id()))
+      }
+      val dumpPerson = new Subcommand("dumpPerson") with Runnable{
+        val id = trailArg[Int]()
+        override def run() = dumpJson(client.getPerson(id()))
+      }
+      val dumpEvent = new Subcommand("dumpEvent") with Runnable{
+        val id = trailArg[Int]()
+        override def run() = dumpJson(client.getEvent(id()))
+      }
+      val dumpLocation = new Subcommand("dumpLocation") with Runnable{
+        val id = trailArg[Int]()
+        override def run() = dumpJson(client.getLocation(id()))
+      }
+      val dumpOrganization = new Subcommand("dumpOrganization") with Runnable{
+        val id = trailArg[Int]()
+        override def run() = dumpJson(client.getOrganization(id()))
+      }
+      val dumpThing = new Subcommand("dumpThing") with Runnable{
+        val id = trailArg[Int]()
+        override def run() = dumpJson(client.getThing(id()))
       }
       val createDataTable = new Subcommand("createDataTable") with Runnable {
         val definition = trailArg[String]()
@@ -106,6 +146,7 @@ object Main {
         val rawJson = trailArg[String]()
         override def run() = _rawPost(client, path(), rawJson())
       }
+
     }
 
     try {
