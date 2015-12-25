@@ -113,7 +113,7 @@ object Main {
 
       val describeCommands = new Subcommand("describe") {
 
-        val describeDataTable = new Subcommand("dataTable") with Runnable {
+        val describeDataTable = new Subcommand("table") with Runnable {
           val id = trailArg[Int]()
           val filter = trailArg[String](required = false)
 
@@ -160,7 +160,7 @@ object Main {
       }
       val dumpCommands = new Subcommand("dump") {
 
-        val dumpDataTable = new Subcommand("dataTable") with Runnable {
+        val dumpDataTable = new Subcommand("table") with Runnable {
           val id = trailArg[Int]()
           val filter = trailArg[String](required = false)
 
@@ -168,6 +168,26 @@ object Main {
             case selector => dumpJson(client.dumpDataTable(id()), selector)
           }
         }
+
+        val dumpDataField = new Subcommand("field") with Runnable {
+          val id = trailArg[Int]()
+          val filter = trailArg[String](required = false)
+
+          override def run() = checkJsonPointer(filter.get) match {
+            case selector => dumpJson(client.dumpDataField(id()), selector)
+          }
+        }
+
+        val dumpDataRecord = new Subcommand("record") with Runnable {
+          val id = trailArg[Int]()
+          val filter = trailArg[String](required = false)
+
+          override def run() = checkJsonPointer(filter.get) match {
+            case selector => dumpJson(client.dumpDataRecord(id()), selector)
+          }
+        }
+
+
         val dumpPerson = new Subcommand("person") with Runnable {
           val id = trailArg[Int]()
           val filter = trailArg[String](required = false)
@@ -215,7 +235,7 @@ object Main {
         }
       }
       val createCommands = new Subcommand("create") {
-        val createDataTable = new Subcommand("dataTable") with Runnable {
+        val createDataTable = new Subcommand("table") with Runnable {
           val definition = trailArg[String]()
 
           override def run() = _createDataTable(client, definition())

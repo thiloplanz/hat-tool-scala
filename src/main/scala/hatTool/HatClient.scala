@@ -34,6 +34,8 @@ trait HatClient{
   type HatDataTable = ObjectNode
   type HatDataSource = ObjectNode
   type HatDataTableValues = ObjectNode
+  type HatDataFieldValues = ObjectNode
+  type HatDataRecordValues = ObjectNode
   type HatDataDebit = ObjectNode
   type HatEntity = ObjectNode
   type HatProperty = ObjectNode
@@ -76,6 +78,10 @@ trait HatClient{
   def getDataTableName(id:Int): Future[HatDataTableName]
 
   def dumpDataTable(id:Int): Future[Seq[HatDataTableValues]]
+
+  def dumpDataField(id:Int): Future[HatDataFieldValues]
+
+  def dumpDataRecord(id:Int): Future[HatDataRecordValues]
 
   def getPerson(id:Int): Future[HatEntity]
 
@@ -205,6 +211,10 @@ private abstract class HatClientBase(ning: NingJsonClient, host: String, extraQu
   override def getDataTableName(id: Int) = get[HatDataTableName]("data/table/"+id)
 
   override def dumpDataTable(id: Int) = get[Seq[HatDataTableValues]]("data/table/"+id+"/values")
+
+  override def dumpDataField(id: Int) = get[HatDataFieldValues]("data/field/"+id+"/values")
+
+  override def dumpDataRecord(id: Int) = get[HatDataRecordValues]("data/record/"+id+"/values")
 
   override def getPerson(id: Int) = get[HatEntity]("person/"+id+"/values")
 
