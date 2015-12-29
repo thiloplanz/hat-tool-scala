@@ -64,49 +64,56 @@ object Main {
   def main(args: Array[String]) {
 
     lazy val ning = new AsyncHttpClient()
-    lazy val client = HatClient.forOwner(new NingJsonClient(ning), host, owner, ownerPassword)
 
+
+    def client(accessToken: Option[String]) =
+      accessToken match {
+        case None => HatClient.forOwner(new NingJsonClient(ning), host, owner, ownerPassword)
+        case Some(token) => HatClient.forAccessToken(new NingJsonClient(ning), host, token)
+      }
 
 
 
     object Args extends ScallopConf(args){
+      val accessToken = opt[String]("accessToken")
+
       val listCommands = new Subcommand("list") {
 
         val listDataSources = new Subcommand("sources") with Runnable{
           val filter = trailArg[String](required = false)
-          override def run() = checkJsonPointer(filter.get) match { case selector => dumpJson(client.listDataSources, selector) }
+          override def run() = checkJsonPointer(filter.get) match { case selector => dumpJson(client(accessToken.get).listDataSources, selector) }
         }
         val listPersons = new Subcommand("persons") with Runnable{
           val filter = trailArg[String](required = false)
-          override def run() = checkJsonPointer(filter.get) match { case selector => dumpJson(client.listPersons, selector) }
+          override def run() = checkJsonPointer(filter.get) match { case selector => dumpJson(client(accessToken.get).listPersons, selector) }
         }
         val listThings = new Subcommand("things") with Runnable{
           val filter = trailArg[String](required = false)
-          override def run() = checkJsonPointer(filter.get) match { case selector => dumpJson(client.listThings, selector) }
+          override def run() = checkJsonPointer(filter.get) match { case selector => dumpJson(client(accessToken.get).listThings, selector) }
         }
         val listOrgs = new Subcommand("organizations") with Runnable{
           val filter = trailArg[String](required = false)
-          override def run() =  checkJsonPointer(filter.get) match { case selector => dumpJson(client.listOrganizations, selector) }
+          override def run() =  checkJsonPointer(filter.get) match { case selector => dumpJson(client(accessToken.get).listOrganizations, selector) }
         }
         val listLocations = new Subcommand("locations") with Runnable{
           val filter = trailArg[String](required = false)
-          override def run() =  checkJsonPointer(filter.get) match { case selector =>dumpJson(client.listLocations, selector) }
+          override def run() =  checkJsonPointer(filter.get) match { case selector =>dumpJson(client(accessToken.get).listLocations, selector) }
         }
         val listEvents = new Subcommand("events") with Runnable{
           val filter = trailArg[String](required = false)
-          override def run() =  checkJsonPointer(filter.get) match { case selector => dumpJson(client.listEvents, selector) }
+          override def run() =  checkJsonPointer(filter.get) match { case selector => dumpJson(client(accessToken.get).listEvents, selector) }
         }
         val listProperties = new Subcommand("properties") with Runnable{
           val filter = trailArg[String](required = false)
-          override def run() =  checkJsonPointer(filter.get) match { case selector => dumpJson(client.listProperties, selector) }
+          override def run() =  checkJsonPointer(filter.get) match { case selector => dumpJson(client(accessToken.get).listProperties, selector) }
         }
         val listPropertyTypes = new Subcommand("propertyTypes") with Runnable{
           val filter = trailArg[String](required = false)
-          override def run() =  checkJsonPointer(filter.get) match { case selector => dumpJson(client.listPropertyTypes, selector) }
+          override def run() =  checkJsonPointer(filter.get) match { case selector => dumpJson(client(accessToken.get).listPropertyTypes, selector) }
         }
         val listUnitsOfMeasurements = new Subcommand("units") with Runnable{
           val filter = trailArg[String](required = false)
-          override def run() =  checkJsonPointer(filter.get) match { case selector => dumpJson(client.listUnitsOfMeasurement, selector) }
+          override def run() =  checkJsonPointer(filter.get) match { case selector => dumpJson(client(accessToken.get).listUnitsOfMeasurement, selector) }
         }
 
       }
@@ -118,7 +125,7 @@ object Main {
           val filter = trailArg[String](required = false)
 
           override def run() = checkJsonPointer(filter.get) match {
-            case selector => dumpJson(client.describeDataTable(id()), selector)
+            case selector => dumpJson(client(accessToken.get).describeDataTable(id()), selector)
           }
         }
         val describeProperty = new Subcommand("property") with Runnable {
@@ -128,8 +135,8 @@ object Main {
           override def run() = checkJsonPointer(filter.get) match {
             case selector =>
               scala.util.control.Exception.allCatch.opt(id().toInt) match {
-                case None => dumpJson(client.describeProperty(id()), selector)
-                case Some(number) => dumpJson(client.describeProperty(number), selector)
+                case None => dumpJson(client(accessToken.get).describeProperty(id()), selector)
+                case Some(number) => dumpJson(client(accessToken.get).describeProperty(number), selector)
               }
           }
         }
@@ -140,8 +147,8 @@ object Main {
           override def run() = checkJsonPointer(filter.get) match {
             case selector =>
               scala.util.control.Exception.allCatch.opt(id().toInt) match {
-                case None => dumpJson(client.describePropertyType(id()), selector)
-                case Some(number) => dumpJson(client.describePropertyType(number), selector)
+                case None => dumpJson(client(accessToken.get).describePropertyType(id()), selector)
+                case Some(number) => dumpJson(client(accessToken.get).describePropertyType(number), selector)
               }
           }
         }
@@ -152,8 +159,8 @@ object Main {
           override def run() = checkJsonPointer(filter.get) match {
             case selector =>
               scala.util.control.Exception.allCatch.opt(id().toInt) match {
-                case None => dumpJson(client.describeUnitOfMeasurement(id()), selector)
-                case Some(number) => dumpJson(client.describeUnitOfMeasurement(number), selector)
+                case None => dumpJson(client(accessToken.get).describeUnitOfMeasurement(id()), selector)
+                case Some(number) => dumpJson(client(accessToken.get).describeUnitOfMeasurement(number), selector)
               }
           }
         }
@@ -165,7 +172,7 @@ object Main {
           val filter = trailArg[String](required = false)
 
           override def run() = checkJsonPointer(filter.get) match {
-            case selector => dumpJson(client.dumpDataTable(id()), selector)
+            case selector => dumpJson(client(accessToken.get).dumpDataTable(id()), selector)
           }
         }
 
@@ -174,7 +181,7 @@ object Main {
           val filter = trailArg[String](required = false)
 
           override def run() = checkJsonPointer(filter.get) match {
-            case selector => dumpJson(client.dumpDataField(id()), selector)
+            case selector => dumpJson(client(accessToken.get).dumpDataField(id()), selector)
           }
         }
 
@@ -183,7 +190,7 @@ object Main {
           val filter = trailArg[String](required = false)
 
           override def run() = checkJsonPointer(filter.get) match {
-            case selector => dumpJson(client.dumpDataRecord(id()), selector)
+            case selector => dumpJson(client(accessToken.get).dumpDataRecord(id()), selector)
           }
         }
 
@@ -193,7 +200,7 @@ object Main {
           val filter = trailArg[String](required = false)
 
           override def run() = checkJsonPointer(filter.get) match {
-            case selector => dumpJson(client.getPerson(id()), selector)
+            case selector => dumpJson(client(accessToken.get).getPerson(id()), selector)
           }
         }
         val dumpEvent = new Subcommand("event") with Runnable {
@@ -201,7 +208,7 @@ object Main {
           val filter = trailArg[String](required = false)
 
           override def run() = checkJsonPointer(filter.get) match {
-            case selector => dumpJson(client.getEvent(id()), selector)
+            case selector => dumpJson(client(accessToken.get).getEvent(id()), selector)
           }
         }
         val dumpLocation = new Subcommand("location") with Runnable {
@@ -209,7 +216,7 @@ object Main {
           val filter = trailArg[String](required = false)
 
           override def run() = checkJsonPointer(filter.get) match {
-            case selector => dumpJson(client.getLocation(id()), selector)
+            case selector => dumpJson(client(accessToken.get).getLocation(id()), selector)
           }
         }
         val dumpOrganization = new Subcommand("organization") with Runnable {
@@ -217,7 +224,7 @@ object Main {
           val filter = trailArg[String](required = false)
 
           override def run() = checkJsonPointer(filter.get) match {
-            case selector => dumpJson(client.getOrganization(id()), selector)
+            case selector => dumpJson(client(accessToken.get).getOrganization(id()), selector)
           }
         }
         val dumpThing = new Subcommand("thing") with Runnable {
@@ -225,26 +232,26 @@ object Main {
           val filter = trailArg[String](required = false)
 
           override def run() = checkJsonPointer(filter.get) match {
-            case selector => dumpJson(client.getThing(id()), selector)
+            case selector => dumpJson(client(accessToken.get).getThing(id()), selector)
           }
         }
         val dumpDataDebitValues = new Subcommand("dataDebitValues") with Runnable {
           val key = trailArg[String]()
           val filter = trailArg[String](required = false)
-          override def run() =  checkJsonPointer(filter.get) match { case selector => dumpJson(client.dumpDataDebitValues(key()), selector); }
+          override def run() =  checkJsonPointer(filter.get) match { case selector => dumpJson(client(accessToken.get).dumpDataDebitValues(key()), selector); }
         }
       }
       val createCommands = new Subcommand("create") {
         val createDataTable = new Subcommand("table") with Runnable {
           val definition = trailArg[String]()
 
-          override def run() = _createDataTable(client, definition())
+          override def run() = _createDataTable(client(accessToken.get), definition())
         }
         val createBundle = new Subcommand("bundle") with Runnable {
           val table = opt[Int]()
           val name = trailArg[String]()
 
-          override def run() = dumpJson(client.createContextlessBundle(name(), table()))
+          override def run() = dumpJson(client(accessToken.get).createContextlessBundle(name(), table()))
         }
       }
       val propose = new Subcommand("propose") {
@@ -253,7 +260,7 @@ object Main {
           val table = opt[Int]()
           val name = trailArg[String]()
 
-          override def run() = dumpJson(client.proposeDataDebit(name(), new HatContextLessBundle(name(), table()),
+          override def run() = dumpJson(client(accessToken.get).proposeDataDebit(name(), new HatContextLessBundle(name(), table()),
             startDate = new Date()
           ))
         }
@@ -262,20 +269,20 @@ object Main {
         val enableDataDebit = new Subcommand("dataDebit") with Runnable {
           val key = trailArg[String]()
 
-          override def run() = dumpJson(client.enableDataDebit(key()));
+          override def run() = dumpJson(client(accessToken.get).enableDataDebit(key()));
         }
       }
       val disable = new Subcommand("disable") {
         val disableDataDebit = new Subcommand("dataDebit") with Runnable {
           val key = trailArg[String]()
 
-          override def run() = dumpJson(client.disableDataDebit(key()));
+          override def run() = dumpJson(client(accessToken.get).disableDataDebit(key()));
         }
       }
       val rawPost = new Subcommand("POST") with Runnable {
         val path = trailArg[String]()
         val rawJson = trailArg[String]()
-        override def run() = _rawPost(client, path(), rawJson())
+        override def run() = _rawPost(client(accessToken.get), path(), rawJson())
       }
 
     }

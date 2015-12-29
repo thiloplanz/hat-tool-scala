@@ -277,10 +277,15 @@ private abstract class HatClientBase(ning: NingJsonClient, host: String, extraQu
 private class HatOwnerClient(ning: NingJsonClient, host:String, name: String, password: String, ec: ExecutionContext)
   extends HatClientBase(ning, host, Seq("username"-> name, "password" -> password))(ec)
 
+private class AccessTokenClient(ning: NingJsonClient, host:String, accessToken: String, ec: ExecutionContext)
+  extends HatClientBase(ning, host, Seq("access_token" -> accessToken))(ec)
 
 object HatClient {
 
   def forOwner(ning: NingJsonClient, host: String, name: String, password: String)(implicit ec: ExecutionContext) : HatClient
   = new HatOwnerClient(ning, host, name, password, ec)
+
+  def forAccessToken(ning: NingJsonClient, host: String, accessToken: String)(implicit ec: ExecutionContext) : HatClient
+  = new AccessTokenClient(ning, host, accessToken, ec)
 
 }
