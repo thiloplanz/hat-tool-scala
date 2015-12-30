@@ -121,11 +121,13 @@ object Main {
       val describeCommands = new Subcommand("describe") {
 
         val describeDataTable = new Subcommand("table") with Runnable {
-          val id = trailArg[Int]()
+          val id = trailArg[String]()
           val filter = trailArg[String](required = false)
 
           override def run() = checkJsonPointer(filter.get) match {
-            case selector => dumpJson(client(accessToken.get).describeDataTable(id()), selector)
+            case selector => dumpJson(client(accessToken.get).getTableId(id()).flatMap { id =>
+              client(accessToken.get).describeDataTable(id)
+            }, selector)
           }
         }
         val describeProperty = new Subcommand("property") with Runnable {
@@ -168,11 +170,13 @@ object Main {
       val dumpCommands = new Subcommand("dump") {
 
         val dumpDataTable = new Subcommand("table") with Runnable {
-          val id = trailArg[Int]()
+          val id = trailArg[String]()
           val filter = trailArg[String](required = false)
 
           override def run() = checkJsonPointer(filter.get) match {
-            case selector => dumpJson(client(accessToken.get).dumpDataTable(id()), selector)
+
+            case selector => dumpJson(client(accessToken.get).getTableId(id()).flatMap { id =>
+              client(accessToken.get).dumpDataTable(id)}, selector)
           }
         }
 
@@ -248,21 +252,23 @@ object Main {
           override def run() = _createDataTable(client(accessToken.get), definition())
         }
         val createBundle = new Subcommand("bundle") with Runnable {
-          val table = opt[Int]()
+          val table = opt[String]()
           val name = trailArg[String]()
 
-          override def run() = dumpJson(client(accessToken.get).createContextlessBundle(name(), table()))
+          override def run() = dumpJson(client(accessToken.get).getTableId(table()).flatMap { id =>
+            client(accessToken.get).createContextlessBundle(name(), id)})
         }
       }
       val propose = new Subcommand("propose") {
 
         val proposeDataDebit = new Subcommand("dataDebit") with Runnable {
-          val table = opt[Int]()
+          val table = opt[String]()
           val name = trailArg[String]()
 
-          override def run() = dumpJson(client(accessToken.get).proposeDataDebit(name(), new HatContextLessBundle(name(), table()),
+          override def run() = dumpJson(client(accessToken.get).getTableId(table()).flatMap { id =>
+            client(accessToken.get).proposeDataDebit(name(), new HatContextLessBundle(name(), id),
             startDate = new Date()
-          ))
+          )})
         }
       }
       val enable = new Subcommand("enable") {

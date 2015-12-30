@@ -26,6 +26,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode
 import com.ning.http.client.Response
 
 import scala.concurrent.{ExecutionContext, Future}
+import scala.util.Try
 
 trait HatClient{
 
@@ -113,6 +114,15 @@ trait HatClient{
   def dumpDataDebitValues(key: String): Future[JsonNode]
 
   def rawPost(path: String, entity: JsonNode): Future[JsonNode]
+
+  /**
+   * @param tableNameOrId can be numeric (assumed to be the ID already), or source:tableName
+   *
+   * fails if there is no such table
+   */
+  def getTableId(tableNameOrId: String) : Future[Int]
+
+  def getTableId(source: String, name: String) : Future[Int]
 
 }
 
@@ -271,6 +281,20 @@ private abstract class HatClientBase(ning: NingJsonClient, host: String, extraQu
   override def dumpDataDebitValues(key: String) = get[JsonNode]("dataDebit/"+key+"/values")
 
   override def rawPost(path: String, entity: JsonNode) = post[JsonNode](path, entity)
+
+  override def getTableId(tableNameOrId: String) =
+    Try(tableNameOrId.toInt).toOption match {
+      case Some(id) => Future.successful(id)
+      case None => tableNameOrId.split(':') match {
+        case Array(name) => throw new IllegalArgumentException("invalid tableNameOrId, should be source:name "+tableNameOrId)
+        case Array(source, name) => getTableId(source, name)
+        case _ => throw new IllegalArgumentException("invalid tableNameOrId, should be source:name "+tableNameOrId)
+      }
+    }
+
+  override def getTableId(source: String, name: String) =
+    get[HatDataTableName]("data/table", queryParams = Seq( "source" -> source, "name" -> name)).map{ _.id}
+
 
 }
 
