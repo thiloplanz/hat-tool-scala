@@ -21,7 +21,7 @@ import java.util.concurrent.ConcurrentHashMap
 
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.node.ArrayNode
-import hatTool.HatClient.{HatDataRecordValues, HatDataFieldValues}
+import hatTool.HatClient.{HatDataRecordValues, HatDataTable}
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Try
@@ -32,12 +32,19 @@ import scala.util.Try
 
 class HatDataDictionaryCache(client:HatClient)(implicit ec: ExecutionContext) extends DelegatingHatClient(client) {
 
-  // TODO: also cache the table and field description JSON
-  private val cache = new ConcurrentHashMap[String, Int]
+  private val idCache = new ConcurrentHashMap[String, Future[Int]]
 
-  private def updateCache(name: String, id: Future[Int]) = { id.map{ id => cache.put(name, id); id } }
+  private val tableCache = new ConcurrentHashMap[Int, Future[HatDataTable]]
 
-  private def getCached(name: String) = Option(cache.get(name)).map(Future.successful(_))
+  private def updateCache(name: String, id: Future[Int]) = { idCache.put(name, id); id  }
+
+  private def updateCache(id: Int, table: Future[HatDataTable]) = { tableCache.put(id, table); table}
+
+  private def getCached(name: String) = Option(idCache.get(name))
+
+  private def getCached(id: Int) = Option(tableCache.get(id))
+
+
 
   /**
    * @param tableNameOrId can be numeric (assumed to be the ID already), or source:tableName
@@ -72,7 +79,7 @@ class HatDataDictionaryCache(client:HatClient)(implicit ec: ExecutionContext) ex
   // TODO: stop using JSON, have some proper beans
   def getFieldId(tableNameOrId: String, fieldName: String) : Future[Int] =
     getDataTableId(tableNameOrId).flatMap { tableId =>
-      client.describeDataTable(tableId).map { tableJson =>
+      describeDataTable(tableId).map { tableJson =>
         import scala.collection.JavaConversions._
         tableJson.get("fields").asInstanceOf[ArrayNode].find(_.get("name").asText == fieldName) match {
           case None => throw new IllegalArgumentException("no field named '"+fieldName+"' in table "+tableId)
@@ -80,6 +87,8 @@ class HatDataDictionaryCache(client:HatClient)(implicit ec: ExecutionContext) ex
         }
       }
     }
+  
+  override def describeDataTable(tableId: Int) = getCached(tableId).getOrElse(updateCache(tableId, client.describeDataTable(tableId)))
 
 
    // improved HatClient methods that can now accept names instead of ids
