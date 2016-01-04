@@ -43,13 +43,15 @@ object Main {
   private val ownerPassword = config.getString("hat.owner.password")
 
 
+  private val timelimit = Duration("10 seconds")
+
   private val mapper =  new ObjectMapper with ScalaObjectMapper
   mapper.registerModule(DefaultScalaModule)
   mapper.enable(SerializationFeature.INDENT_OUTPUT);
 
 
   def dumpJson(json: Future[Any], selector: Option[JsonPointer] = None) = try {
-    val data = Await.result(json, Duration("10 seconds"))
+    val data = Await.result(json, timelimit)
     println(mapper.writeValueAsString(
       selector match {
         case None => data
@@ -59,7 +61,34 @@ object Main {
     case e: UnsuccessfulRequestException => println(e.toString)
   }
 
-  def checkJsonPointer(expression: Option[String]) = expression.map { JsonPointer.valueOf(_) }
+  def dumpGrid(full: Option[Boolean], json: Future[Seq[ObjectNode]], columns: Seq[String], selector: Option[JsonPointer]) = full match {
+    case Some(true) => dumpJson(json, selector)
+    case _ => {
+      try {
+        val data = Await.result(json, timelimit).map { row =>
+          columns.map { col =>
+            row.get(col).asText()
+          }
+        }
+        println(Tabulator.format(Seq(columns) ++ data))
+
+      } catch {
+        case e: UnsuccessfulRequestException => println(e.toString)
+      }
+    }
+  }
+
+
+  def checkJsonPointer(expression: Option[String]) : Option[JsonPointer] = expression.map { JsonPointer.valueOf(_) }
+
+  def checkJsonPointer(expression: Option[String], grid: Option[Boolean], full: Option[Boolean]) : Option[JsonPointer] =
+    (grid, full) match {
+      case (Some(true), Some(true)) => throw new IllegalArgumentException("specify either --grid or --full, but not both")
+      case (Some(false), Some(false)) => throw new IllegalArgumentException("specify either --grid or --full")
+      case (_, Some(true)) => checkJsonPointer(expression)
+      case _ => if (expression == None) None else throw new IllegalArgumentException("cannot use --grid with a JsonPointer expression ('"+expression.get+"')")
+    }
+
 
   def main(args: Array[String]) {
 
@@ -78,8 +107,11 @@ object Main {
       val listCommands = new Subcommand("list") {
 
         val listDataSources = new Subcommand("sources") with Runnable{
+          val grid = toggle()
+          val full = toggle()
           val filter = trailArg[String](required = false)
-          override def run() = checkJsonPointer(filter.get) match { case selector => dumpJson(client.listDataSources, selector) }
+          override def run() = checkJsonPointer(filter.get, grid.get, full.get) match { case selector =>
+            dumpGrid(full.get, client.listDataSources, Seq("id", "source","name", "dateCreated", "lastUpdated"), selector) }
         }
         val listPersons = new Subcommand("persons") with Runnable{
           val filter = trailArg[String](required = false)
@@ -325,4 +357,32 @@ object Main {
     dumpJson(client.rawPost(path, entity))
   }
 
+}
+
+
+// from http://stackoverflow.com/a/7542476/14955
+object Tabulator {
+  def format(table: Seq[Seq[Any]]) = table match {
+    case Seq() => ""
+    case _ =>
+      val sizes = for (row <- table) yield (for (cell <- row) yield if (cell == null) 0 else cell.toString.length + 2)
+      val colSizes = for (col <- sizes.transpose) yield col.max
+      val rows = for (row <- table) yield formatRow(row, colSizes)
+      formatRows(rowSeparator(colSizes), rows)
+  }
+
+  def formatRows(rowSeparator: String, rows: Seq[String]): String = (
+    rowSeparator ::
+      rows.head ::
+      rowSeparator ::
+      rows.tail.toList :::
+      rowSeparator ::
+      List()).mkString("\n")
+
+  def formatRow(row: Seq[Any], colSizes: Seq[Int]) = {
+    val cells = (for ((item, size) <- row.zip(colSizes)) yield if (size == 0) "" else ("%" + size + "s").format(item))
+    cells.mkString("|", "|", "|")
+  }
+
+  def rowSeparator(colSizes: Seq[Int]) = colSizes map { "-" * _ } mkString("+", "+", "+")
 }
