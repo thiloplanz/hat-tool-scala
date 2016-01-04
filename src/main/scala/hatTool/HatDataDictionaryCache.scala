@@ -1,4 +1,4 @@
-// Copyright (c) 2015, Thilo Planz.
+// Copyright (c) 2015/2016, Thilo Planz.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the Apache License, Version 2.0
@@ -19,7 +19,9 @@ package hatTool
 
 import java.util.concurrent.ConcurrentHashMap
 
+import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.node.ArrayNode
+import hatTool.HatClient.{HatDataRecordValues, HatDataFieldValues}
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Try
@@ -28,8 +30,9 @@ import scala.util.Try
  * Tool to look up (and cache) the HAT data dictionary object ids (for tables and fields)
  */
 
-class HatDataDictionaryCache(client:HatClient)(implicit ec: ExecutionContext)  {
+class HatDataDictionaryCache(client:HatClient)(implicit ec: ExecutionContext) extends DelegatingHatClient(client) {
 
+  // TODO: also cache the table and field description JSON
   private val cache = new ConcurrentHashMap[String, Int]
 
   private def updateCache(name: String, id: Future[Int]) = { id.map{ id => cache.put(name, id); id } }
@@ -78,6 +81,17 @@ class HatDataDictionaryCache(client:HatClient)(implicit ec: ExecutionContext)  {
       }
     }
 
+
+   // improved HatClient methods that can now accept names instead of ids
+
+  def createContextlessBundle(name: String, tableId: String) : Future[JsonNode] = getDataTableId(tableId).flatMap{ id => createContextlessBundle(name, id) }
+
+
+  def createDataRecordWithNamedFields(name: String, fields: Seq[ (String, String)]) : Future[HatDataRecordValues] =
+  // TODO: also get the proper field name (but currently HAT does not care anyway, see https://github.com/Hub-of-all-Things/HAT2.0/issues/19
+    Future.sequence(fields.map{ case( field, value) => getFieldId(field).map{ id => (id, field, value)}}).flatMap{ fields =>
+      createDataRecord(name, fields)
+    }
 
 
 }

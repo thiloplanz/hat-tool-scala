@@ -1,4 +1,4 @@
-// Copyright (c) 2015, Thilo Planz.
+// Copyright (c) 2015/2016, Thilo Planz.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the Apache License, Version 2.0
@@ -30,19 +30,7 @@ import scala.util.Try
 
 trait HatClient{
 
-  // TODO: prepare proper Scala classes to return instead of raw JSON nodes
-
-  type HatDataTable = ObjectNode
-  type HatDataSource = ObjectNode
-  type HatDataTableValues = ObjectNode
-  type HatDataFieldValues = ObjectNode
-  type HatDataRecordValues = ObjectNode
-  type HatDataDebit = ObjectNode
-  type HatEntity = ObjectNode
-  type HatProperty = ObjectNode
-  type HatPropertyType = ObjectNode
-  type HatUnitOfMeasurement = ObjectNode
-
+  import HatClient._
 
   def listDataSources() : Future[Seq[HatDataSource]]
 
@@ -96,6 +84,14 @@ trait HatClient{
 
   def createDataTable(definition: HatDataTable): Future[HatDataTable]
 
+  /**
+   *
+   * @param name
+   * @param fields a sequence of fieldId , fieldName => value mappings
+   * @return
+   */
+  def createDataRecord(name: String, fields: Seq[(Int, String, String)]) : Future[HatDataRecordValues]
+
   def createContextlessBundle(name: String, tableId: Int): Future[JsonNode]
 
   def proposeDataDebit(name: String,
@@ -143,7 +139,56 @@ case class HatDataTableName(
                          )
 
 
+abstract class DelegatingHatClient(delegate: HatClient) extends HatClient {
+  import HatClient._
+
+  override def listDataSources()  = delegate.listDataSources()
+  override def listPersons()= delegate.listPersons()
+  override def listThings() = delegate.listThings()
+  override def listLocations() = delegate.listLocations()
+  override def listOrganizations() = delegate.listOrganizations()
+  override def listEvents() = delegate.listEvents()
+  override def listProperties() = delegate.listProperties()
+  override def listPropertyTypes() = delegate.listPropertyTypes()
+  override def listUnitsOfMeasurement() = delegate.listUnitsOfMeasurement()
+  override def describeDataTable(id:Int)= delegate.describeDataTable(id)
+  override def describeProperty(id: Int)= delegate.describeProperty(id)
+  override def describeProperty(name: String)= delegate.describeProperty(name)
+  override def describePropertyType(id: Int)= delegate.describePropertyType(id)
+  override def describePropertyType(name: String)= delegate.describePropertyType(name)
+  override def describeUnitOfMeasurement(id: Int)= delegate.describeUnitOfMeasurement(id)
+  override def describeUnitOfMeasurement(name: String)= delegate.describeUnitOfMeasurement(name)
+  override def getDataTableName(id:Int)= delegate.getDataTableName(id)
+  override def dumpDataTable(id:Int)= delegate.dumpDataTable(id)
+  override def dumpDataField(id:Int)= delegate.dumpDataField(id)
+  override def dumpDataRecord(id:Int)= delegate.dumpDataRecord(id)
+  override def getPerson(id:Int)= delegate.getPerson(id)
+  override def getThing(id:Int)= delegate.getThing(id)
+  override def getLocation(id:Int)= delegate.getLocation(id)
+  override def getOrganization(id:Int)= delegate.getOrganization(id)
+  override def getEvent(id:Int)= delegate.getEvent(id)
+  override def createDataTable(definition: HatDataTable)= delegate.createDataTable(definition)
+  override def createDataRecord(name: String, fields: Seq[(Int, String, String)]) = delegate.createDataRecord(name, fields)
+  override def createContextlessBundle(name: String, tableId: Int)= delegate.createContextlessBundle(name, tableId)
+  override def proposeDataDebit(name: String,
+                       bundle: HatBundleDefinition,
+                       startDate: Date = new Date(),
+                       validity: Duration = Duration.ofDays(3650),
+                       rolling: Boolean = false,
+                       sell: Boolean = false,
+                       price: Float = 0
+                        ) = delegate.proposeDataDebit(name, bundle, startDate, validity, rolling, sell, price)
+  override def enableDataDebit(key: String) = delegate.enableDataDebit(key)
+  override def disableDataDebit(key: String) = delegate.disableDataDebit(key)
+  override def dumpDataDebitValues(key: String)= delegate.dumpDataDebitValues(key)
+  override def rawPost(path: String, entity: JsonNode)= delegate.rawPost(path, entity)
+  override def getDataTableId(source: String, name: String) = delegate.getDataTableId(source, name)
+}
+
+
 private abstract class HatClientBase(ning: NingJsonClient, host: String, extraQueryParams: Seq[(String, String)])(implicit val ec: ExecutionContext) extends HatClient {
+
+  import HatClient._
 
   def get[T:Manifest](path: String, queryParams: Seq[(String, String)] = Map.empty.toList)  =
     ning.get[T](host + path, queryParams = extraQueryParams ++ queryParams)
@@ -217,7 +262,10 @@ private abstract class HatClientBase(ning: NingJsonClient, host: String, extraQu
 
   override def dumpDataField(id: Int) = get[HatDataFieldValues]("data/field/"+id+"/values")
 
-  override def dumpDataRecord(id: Int) = get[HatDataRecordValues]("data/record/"+id+"/values")
+  override def dumpDataRecord(id: Int) = get[HatDataRecordValues]("data/record/"+id+"/values").recoverWith {
+    // this will return 404 if there are no values, so we try to get the record itself
+    case x: UnsuccessfulRequestException => get[HatDataRecordValues]("data/record/"+id)
+  }
 
   override def getPerson(id: Int) = get[HatEntity]("person/"+id+"/values")
 
@@ -230,6 +278,14 @@ private abstract class HatClientBase(ning: NingJsonClient, host: String, extraQu
   override def getEvent(id: Int) = get[HatEntity]("event/"+id+"/values")
 
   override def createDataTable(definition: ObjectNode) = post[HatDataTable]("data/table", definition, okayStatusCode = 201)
+
+  override def createDataRecord(name: String, fields: Seq[(Int, String, String)]) =
+    fields match {
+      case Seq() =>  post[HatDataRecordValues]("data/record", Map("name" -> name), okayStatusCode = 201)
+      case _ => post[HatDataRecordValues]("data/record/values", Map("record" -> Map("name" -> name),
+      "values" -> fields.map{case (f, n, v) => Map("field" -> Map("id" -> f, "name" -> n), "value" -> v) }), okayStatusCode = 201)
+    }
+
 
   override def createContextlessBundle(name: String, tableId: Int) = {
     // first we need the table information
@@ -294,5 +350,18 @@ object HatClient {
 
   def forAccessToken(ning: NingJsonClient, host: String, accessToken: String)(implicit ec: ExecutionContext) : HatClient
   = new AccessTokenClient(ning, host, accessToken, ec)
+
+  // TODO: prepare proper Scala classes to return instead of raw JSON nodes
+
+  final type HatDataTable = ObjectNode
+  final type HatDataSource = ObjectNode
+  final type HatDataTableValues = ObjectNode
+  final type HatDataFieldValues = ObjectNode
+  final type HatDataRecordValues = ObjectNode
+  final type HatDataDebit = ObjectNode
+  final type HatEntity = ObjectNode
+  final type HatProperty = ObjectNode
+  final type HatPropertyType = ObjectNode
+  final type HatUnitOfMeasurement = ObjectNode
 
 }

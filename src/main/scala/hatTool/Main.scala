@@ -1,4 +1,4 @@
-// Copyright (c) 2015, Thilo Planz.
+// Copyright (c) 2015/2016, Thilo Planz.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the Apache License, Version 2.0
@@ -251,17 +251,22 @@ object Main {
         }
         val createBundle = new Subcommand("bundle") with Runnable {
           val table = opt[String]()
-          val name = trailArg[String]()
+          val name = opt[String](required = true)
 
-          override def run() = dumpJson(dataDict.getDataTableId(table()).flatMap { id =>
-            client.createContextlessBundle(name(), id)})
+          override def run() = dumpJson(dataDict.createContextlessBundle(name(), table()))
+        }
+        val createDataRecord = new Subcommand("record") with Runnable {
+          val name = opt[String](required = true)
+          val empty = toggle(default=Some(false))
+          val fields = propsLong[String]("fields")
+          override def run = _createDataRecord(dataDict, name(), empty(), fields.toIndexedSeq)
         }
       }
       val propose = new Subcommand("propose") {
 
         val proposeDataDebit = new Subcommand("dataDebit") with Runnable {
           val table = opt[String]()
-          val name = trailArg[String]()
+          val name = opt[String](required = true)
 
           override def run() = dumpJson(dataDict.getDataTableId(table()).flatMap { id =>
             client.proposeDataDebit(name(), new HatContextLessBundle(name(), id),
@@ -307,6 +312,12 @@ object Main {
   private def _createDataTable(client: HatClient, fileName: String): Unit ={
     val definition = mapper.readValue[ObjectNode](new File(fileName))
     dumpJson(client.createDataTable(definition))
+  }
+
+  private def _createDataRecord(client: HatDataDictionaryCache, name: String, empty: Boolean, fields: Seq[(String, String)]) = {
+    if (empty && fields.nonEmpty) throw new IllegalArgumentException("use either --empty or --fields, not both")
+    if (fields.isEmpty && !empty) throw new IllegalArgumentException("specify --fields for the record, or use --empty")
+    dumpJson(client.createDataRecordWithNamedFields(name, fields))
   }
 
   private def _rawPost(client: HatClient, path: String, fileName: String): Unit = {
