@@ -137,9 +137,9 @@ object Main {
           val filter = trailArg[String](required = false)
           override def run() =  checkJsonPointer(filter.get) match { case selector => dumpJson(client.listProperties, selector) }
         }
-        val listPropertyTypes = new Subcommand("propertyTypes") with Runnable{
+        val listPropertyTypes = new Subcommand("types") with Runnable{
           val filter = trailArg[String](required = false)
-          override def run() =  checkJsonPointer(filter.get) match { case selector => dumpJson(client.listPropertyTypes, selector) }
+          override def run() =  checkJsonPointer(filter.get) match { case selector => dumpJson(client.listTypes, selector) }
         }
         val listUnitsOfMeasurements = new Subcommand("units") with Runnable{
           val filter = trailArg[String](required = false)
@@ -172,15 +172,15 @@ object Main {
               }
           }
         }
-        val describePropertyType = new Subcommand("propertyType") with Runnable {
+        val describePropertyType = new Subcommand("type") with Runnable {
           val id = trailArg[String]()
           val filter = trailArg[String](required = false)
 
           override def run() = checkJsonPointer(filter.get) match {
             case selector =>
               scala.util.control.Exception.allCatch.opt(id().toInt) match {
-                case None => dumpJson(client.describePropertyType(id()), selector)
-                case Some(number) => dumpJson(client.describePropertyType(number), selector)
+                case None => dumpJson(client.describeType(id()), selector)
+                case Some(number) => dumpJson(client.describeType(number), selector)
               }
           }
         }
@@ -292,6 +292,11 @@ object Main {
           val empty = toggle(default=Some(false))
           val fields = propsLong[String]("fields")
           override def run = _createDataRecord(dataDict, name(), empty(), fields.toIndexedSeq)
+        }
+        val createThing = new Subcommand("thing") with Runnable {
+          val name = opt[String](required = true)
+          val types = propsLong[Int]("types")
+          override def run = dumpJson(dataDict.createThing(name(), types.toIndexedSeq))
         }
       }
       val propose = new Subcommand("propose") {

@@ -46,7 +46,7 @@ trait HatClient{
 
   def listProperties() : Future[Seq[HatProperty]]
 
-  def listPropertyTypes() : Future[Seq[HatPropertyType]]
+  def listTypes() : Future[Seq[HatType]]
 
   def listUnitsOfMeasurement() : Future[Seq[HatUnitOfMeasurement]]
 
@@ -56,9 +56,9 @@ trait HatClient{
 
   def describeProperty(name: String): Future[HatProperty]
 
-  def describePropertyType(id: Int): Future[HatPropertyType]
+  def describeType(id: Int): Future[HatType]
 
-  def describePropertyType(name: String): Future[HatPropertyType]
+  def describeType(name: String): Future[HatType]
 
   def describeUnitOfMeasurement(id: Int): Future[HatUnitOfMeasurement]
 
@@ -92,7 +92,11 @@ trait HatClient{
    */
   def createDataRecord(name: String, fields: Seq[(Int, String, String)]) : Future[HatDataRecordValues]
 
+  def createThing(name: String, types: Seq[(String,Int)] = Seq.empty) : Future[HatEntity]
+
   def createContextlessBundle(name: String, tableId: Int): Future[JsonNode]
+
+  def addTypesToThing(id: Int, types: Seq[(String,Int)]) : Future[Unit]
 
   def proposeDataDebit(name: String,
                        bundle: HatBundleDefinition,
@@ -149,13 +153,13 @@ abstract class DelegatingHatClient(delegate: HatClient) extends HatClient {
   override def listOrganizations() = delegate.listOrganizations()
   override def listEvents() = delegate.listEvents()
   override def listProperties() = delegate.listProperties()
-  override def listPropertyTypes() = delegate.listPropertyTypes()
+  override def listTypes() = delegate.listTypes()
   override def listUnitsOfMeasurement() = delegate.listUnitsOfMeasurement()
   override def describeDataTable(id:Int)= delegate.describeDataTable(id)
   override def describeProperty(id: Int)= delegate.describeProperty(id)
   override def describeProperty(name: String)= delegate.describeProperty(name)
-  override def describePropertyType(id: Int)= delegate.describePropertyType(id)
-  override def describePropertyType(name: String)= delegate.describePropertyType(name)
+  override def describeType(id: Int)= delegate.describeType(id)
+  override def describeType(name: String)= delegate.describeType(name)
   override def describeUnitOfMeasurement(id: Int)= delegate.describeUnitOfMeasurement(id)
   override def describeUnitOfMeasurement(name: String)= delegate.describeUnitOfMeasurement(name)
   override def getDataTableName(id:Int)= delegate.getDataTableName(id)
@@ -169,7 +173,9 @@ abstract class DelegatingHatClient(delegate: HatClient) extends HatClient {
   override def getEvent(id:Int)= delegate.getEvent(id)
   override def createDataTable(definition: HatDataTable)= delegate.createDataTable(definition)
   override def createDataRecord(name: String, fields: Seq[(Int, String, String)]) = delegate.createDataRecord(name, fields)
+  override def createThing(name: String, types: Seq[(String, Int)] = Seq.empty) = delegate.createThing(name, types)
   override def createContextlessBundle(name: String, tableId: Int)= delegate.createContextlessBundle(name, tableId)
+  override def addTypesToThing(id: Int, types: Seq[(String, Int)]) = delegate.addTypesToThing(id, types)
   override def proposeDataDebit(name: String,
                        bundle: HatBundleDefinition,
                        startDate: Date = new Date(),
@@ -216,7 +222,7 @@ private abstract class HatClientBase(ning: NingJsonClient, host: String, extraQu
 
   override def listProperties() = get[Seq[HatProperty]]("property")
 
-  override def listPropertyTypes() = get[Seq[HatPropertyType]]("type/type")
+  override def listTypes() = get[Seq[HatType]]("type/type")
 
   override def listUnitsOfMeasurement() = get[Seq[HatUnitOfMeasurement]]("type/unitofmeasurement")
 
@@ -231,13 +237,13 @@ private abstract class HatClientBase(ning: NingJsonClient, host: String, extraQu
   }
 
   // there is no get by ID endpoint
-  override def describePropertyType(id: Int) = listPropertyTypes().map { _.filter { _.get("id").asInt == id} match {
+  override def describeType(id: Int) = listTypes().map { _.filter { _.get("id").asInt == id} match {
     case Seq() => throw new IllegalArgumentException(s"there is no property type with id ${id}")
     case Seq(one) => one
     case many => throw new IllegalArgumentException(s"there are ${many.size} property types with id ${id}")
   }}
 
-  override def describePropertyType(name: String) = get[Seq[HatProperty]]("type/type", queryParams = Seq("name" -> name)).map {
+  override def describeType(name: String) = get[Seq[HatProperty]]("type/type", queryParams = Seq("name" -> name)).map {
     case Seq() => throw new IllegalArgumentException(s"there is no property type called '${name}'")
     case Seq(one) => one
     case many => throw new IllegalArgumentException(s"there are ${many.size} properties types called '${name}'")
@@ -285,6 +291,20 @@ private abstract class HatClientBase(ning: NingJsonClient, host: String, extraQu
       case _ => post[HatDataRecordValues]("data/record/values", Map("record" -> Map("name" -> name),
       "values" -> fields.map{case (f, n, v) => Map("field" -> Map("id" -> f, "name" -> n), "value" -> v) }), okayStatusCode = 201)
     }
+
+
+  private def addTypesToEntity(id: Int, kind: String, types:Seq[(String,Int)]) : Future[Unit] =
+    Future.sequence(types.map { case (r, t) =>
+      post[JsonNode](kind+"/"+id+"/type/"+t, Map("relationshipType" ->r ), okayStatusCode = 201)
+    }).map{_ => None}
+
+  override def addTypesToThing(id: Int, types: Seq[(String,Int)]) : Future[Unit] = addTypesToEntity(id, "thing", types)
+
+
+  // TODO: should be a single API call, https://github.com/Hub-of-all-Things/HAT2.0/issues/20
+  override def createThing(name: String, types: Seq[(String,Int)] = Seq.empty) =
+    post[HatEntity]("thing", Map("name" -> name), okayStatusCode = 201).flatMap{ entity => addTypesToThing(entity.get("id").asInt, types).map{ _ => entity} }
+
 
 
   override def createContextlessBundle(name: String, tableId: Int) = {
@@ -361,7 +381,7 @@ object HatClient {
   final type HatDataDebit = ObjectNode
   final type HatEntity = ObjectNode
   final type HatProperty = ObjectNode
-  final type HatPropertyType = ObjectNode
+  final type HatType = ObjectNode
   final type HatUnitOfMeasurement = ObjectNode
 
 }
