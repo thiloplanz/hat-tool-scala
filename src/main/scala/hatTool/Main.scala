@@ -67,7 +67,7 @@ object Main {
       try {
         val data = Await.result(json, timelimit).map { row =>
           columns.map { col =>
-            row.get(col).asText()
+            row.at("/"+col).asText()
           }
         }
         println(Tabulator.format(Seq(columns) ++ data))
@@ -134,16 +134,25 @@ object Main {
           override def run() =  checkJsonPointer(filter.get) match { case selector => dumpJson(client.listEvents, selector) }
         }
         val listProperties = new Subcommand("properties") with Runnable{
+          val grid = toggle()
+          val full = toggle()
           val filter = trailArg[String](required = false)
-          override def run() =  checkJsonPointer(filter.get) match { case selector => dumpJson(client.listProperties, selector) }
+          override def run() =  checkJsonPointer(filter.get, grid.get, full.get) match {
+            case selector => dumpGrid(full.get, client.listProperties, Seq("id", "name", "description", "propertyType/name", "unitOfMeasurement/name"), selector) }
         }
         val listPropertyTypes = new Subcommand("types") with Runnable{
+          val grid = toggle()
+          val full = toggle()
           val filter = trailArg[String](required = false)
-          override def run() =  checkJsonPointer(filter.get) match { case selector => dumpJson(client.listTypes, selector) }
+          override def run() =  checkJsonPointer(filter.get, grid.get, full.get) match {
+            case selector => dumpGrid(full.get, client.listTypes, Seq("id", "name", "description"), selector) }
         }
         val listUnitsOfMeasurements = new Subcommand("units") with Runnable{
+          val grid = toggle()
+          val full = toggle()
           val filter = trailArg[String](required = false)
-          override def run() =  checkJsonPointer(filter.get) match { case selector => dumpJson(client.listUnitsOfMeasurement, selector) }
+          override def run() =  checkJsonPointer(filter.get, grid.get, full.get) match {
+            case selector => dumpGrid(full.get, client.listUnitsOfMeasurement, Seq("id", "name", "description"), selector) }
         }
 
       }
