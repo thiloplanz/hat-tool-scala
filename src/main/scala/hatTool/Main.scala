@@ -307,6 +307,13 @@ object Main {
           val types = propsLong[Int]("types")
           override def run = dumpJson(dataDict.createThing(name(), types.toIndexedSeq))
         }
+        val createProperty = new Subcommand("property") with Runnable {
+          val name = opt[String](required = true)
+          val ptype = opt[Int]("type", required= true)
+          val unit = opt[Int](required = true)
+          val description = opt[String]()
+          override def run = dumpJson(dataDict.createProperty(name(), ptype(), unit(), description.get))
+        }
       }
       val propose = new Subcommand("propose") {
 

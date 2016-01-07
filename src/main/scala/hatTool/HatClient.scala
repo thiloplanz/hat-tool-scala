@@ -94,9 +94,13 @@ trait HatClient{
 
   def createThing(name: String, types: Seq[(String,Int)] = Seq.empty) : Future[HatEntity]
 
+  def createProperty(name: String, propertyType: Int, unitOfMeasurement: Int, description: Option[String] = None ): Future[HatProperty]
+
   def createContextlessBundle(name: String, tableId: Int): Future[JsonNode]
 
-  def addTypesToThing(id: Int, types: Seq[(String,Int)]) : Future[Unit]
+  def addTypesToThing(entityId: Int, types: Seq[(String,Int)]) : Future[Unit]
+
+  def addDynamicPropertyToThing(entityId: Int, relationshipType: String, propertyId: Int, fieldId: Int) : Future[Int]
 
   def proposeDataDebit(name: String,
                        bundle: HatBundleDefinition,
@@ -174,8 +178,10 @@ abstract class DelegatingHatClient(delegate: HatClient) extends HatClient {
   override def createDataTable(definition: HatDataTable)= delegate.createDataTable(definition)
   override def createDataRecord(name: String, fields: Seq[(Int, String, String)]) = delegate.createDataRecord(name, fields)
   override def createThing(name: String, types: Seq[(String, Int)] = Seq.empty) = delegate.createThing(name, types)
+  override def createProperty(name: String, propertyType: Int, unitOfMeasurement: Int, description: Option[String] = None ) = delegate.createProperty(name, propertyType, unitOfMeasurement, description)
   override def createContextlessBundle(name: String, tableId: Int)= delegate.createContextlessBundle(name, tableId)
   override def addTypesToThing(id: Int, types: Seq[(String, Int)]) = delegate.addTypesToThing(id, types)
+  override def addDynamicPropertyToThing(entityId: Int, relationshipType: String, propertyId: Int, fieldId: Int) = delegate.addDynamicPropertyToThing(entityId, relationshipType, propertyId, fieldId)
   override def proposeDataDebit(name: String,
                        bundle: HatBundleDefinition,
                        startDate: Date = new Date(),
@@ -205,6 +211,8 @@ private abstract class HatClientBase(ning: NingJsonClient, host: String, extraQu
   def put[T:Manifest](path: String, entity: Any, okayStatusCode: Int = 200) =
     ning.putJson[T](host+path, entity, queryParams = extraQueryParams, okayStatusCode = okayStatusCode)
 
+
+  private val CREATED = 201
 
   private val compactISO8601WithoutMilliSeconds = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ssZ").withZone(ZoneId.systemDefault)
 
@@ -283,36 +291,52 @@ private abstract class HatClientBase(ning: NingJsonClient, host: String, extraQu
 
   override def getEvent(id: Int) = get[HatEntity]("event/"+id+"/values")
 
-  override def createDataTable(definition: ObjectNode) = post[HatDataTable]("data/table", definition, okayStatusCode = 201)
+  override def createDataTable(definition: ObjectNode) = post[HatDataTable]("data/table", definition, okayStatusCode = CREATED)
 
   override def createDataRecord(name: String, fields: Seq[(Int, String, String)]) =
     fields match {
-      case Seq() =>  post[HatDataRecordValues]("data/record", Map("name" -> name), okayStatusCode = 201)
+      case Seq() =>  post[HatDataRecordValues]("data/record", Map("name" -> name), okayStatusCode = CREATED)
       case _ => post[HatDataRecordValues]("data/record/values", Map("record" -> Map("name" -> name),
-      "values" -> fields.map{case (f, n, v) => Map("field" -> Map("id" -> f, "name" -> n), "value" -> v) }), okayStatusCode = 201)
+      "values" -> fields.map{case (f, n, v) => Map("field" -> Map("id" -> f, "name" -> n), "value" -> v) }), okayStatusCode = CREATED)
     }
 
 
   private def addTypesToEntity(id: Int, kind: String, types:Seq[(String,Int)]) : Future[Unit] =
     Future.sequence(types.map { case (r, t) =>
-      post[JsonNode](kind+"/"+id+"/type/"+t, Map("relationshipType" ->r ), okayStatusCode = 201)
+      post[JsonNode](kind+"/"+id+"/type/"+t, Map("relationshipType" ->r ), okayStatusCode = CREATED)
     }).map{_ => None}
 
   override def addTypesToThing(id: Int, types: Seq[(String,Int)]) : Future[Unit] = addTypesToEntity(id, "thing", types)
 
 
+  // the HAT API requires detail fields to be present, but only the id is used
+  // https://github.com/Hub-of-all-Things/HAT2.0/issues/19
+  private def dummyName(id: Int) = Map("id" -> id, "name" -> "?")
+  private val dummyRef = dummyName(0)
+
+  private def addDynamicPropertyToEntity(entityId: Int, kind: String, relationshipType: String, propertyId: Int, fieldId: Int) =
+    post[Map[String,Int]](kind+"/"+entityId+"/property/dynamic/"+propertyId, Map(
+      "relationshipType" -> relationshipType,
+      "property" -> dummyRef.++(Seq("id" -> propertyId, "propertyType" -> dummyRef, "unitOfMeasurement" -> dummyRef)),
+      "field" ->dummyName(fieldId)), okayStatusCode = CREATED).map( _.get("id").get)
+
+  override def addDynamicPropertyToThing(entityId: Int, relationshipType: String, propertyId: Int, fieldId: Int) =
+    addDynamicPropertyToEntity(entityId, "thing", relationshipType, propertyId, fieldId)
+
   // TODO: should be a single API call, https://github.com/Hub-of-all-Things/HAT2.0/issues/20
   override def createThing(name: String, types: Seq[(String,Int)] = Seq.empty) =
-    post[HatEntity]("thing", Map("name" -> name), okayStatusCode = 201).flatMap{ entity => addTypesToThing(entity.get("id").asInt, types).map{ _ => entity} }
+    post[HatEntity]("thing", Map("name" -> name), okayStatusCode = CREATED).flatMap{ entity => addTypesToThing(entity.get("id").asInt, types).map{ _ => entity} }
 
-
+  override def createProperty(name: String, propertyType: Int, unitOfMeasurement: Int, description: Option[String] = None ) =
+    post[HatProperty]("property", Map("name" -> name, "description" -> description, "propertyType" -> dummyName(propertyType),
+    "unitOfMeasurement" -> dummyName(unitOfMeasurement)), okayStatusCode = CREATED)
 
   override def createContextlessBundle(name: String, tableId: Int) = {
     // first we need the table information
     getDataTableName(tableId).flatMap { tableInfo =>
       post[JsonNode]("bundles/contextless",
         Map("name" -> name, "tables" -> HatContextLessBundle(name, tableId).table(tableInfo)),
-        okayStatusCode = 201)
+        okayStatusCode = CREATED)
     }
   }
 
@@ -334,7 +358,7 @@ private abstract class HatClientBase(ning: NingJsonClient, host: String, extraQu
       "sell" -> true,
       "price" -> price,
        payload
-      ), okayStatusCode = 201)
+      ), okayStatusCode = CREATED)
     }
 
   override def enableDataDebit(key: String) = put[Response]("dataDebit/"+key+"/enable", true).map { response =>
