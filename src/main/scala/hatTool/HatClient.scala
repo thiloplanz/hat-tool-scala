@@ -98,6 +98,8 @@ trait HatClient{
 
   def createContextlessBundle(name: String, tableId: Int): Future[JsonNode]
 
+  def createContextualBundle(name: String, entityId: Int): Future[JsonNode]
+
   def addTypesToThing(entityId: Int, types: Seq[(String,Int)]) : Future[Unit]
 
   def addDynamicPropertyToThing(entityId: Int, relationshipType: String, propertyId: Int, fieldId: Int) : Future[Int]
@@ -137,6 +139,12 @@ case class HatContextLessBundle(name: String, tableId: Int) extends HatBundleDef
   def table(tableInfo: HatDataTableName) = Seq(
     Map("name" -> name, "bundleTable" ->
       Map("name" -> name, "table"-> Map("id" -> tableId, "name" -> tableInfo.name, "source" -> tableInfo.source))))
+}
+
+case class HatContextualBundle(name: String, entityId: Int) extends HatBundleDefinition {
+  val kind = "contextual"
+  def payload(client: HatClient)(implicit ec: ExecutionContext) = Future.successful(
+    "bundleContextual" -> Map("name" -> name, "entities" -> Seq(Map("entityId"-> entityId))))
 }
 
 @JsonIgnoreProperties(ignoreUnknown = true)
@@ -180,6 +188,7 @@ abstract class DelegatingHatClient(delegate: HatClient) extends HatClient {
   override def createThing(name: String, types: Seq[(String, Int)] = Seq.empty) = delegate.createThing(name, types)
   override def createProperty(name: String, propertyType: Int, unitOfMeasurement: Int, description: Option[String] = None ) = delegate.createProperty(name, propertyType, unitOfMeasurement, description)
   override def createContextlessBundle(name: String, tableId: Int)= delegate.createContextlessBundle(name, tableId)
+  override def createContextualBundle(name: String, entityId: Int)= delegate.createContextualBundle(name, entityId)
   override def addTypesToThing(id: Int, types: Seq[(String, Int)]) = delegate.addTypesToThing(id, types)
   override def addDynamicPropertyToThing(entityId: Int, relationshipType: String, propertyId: Int, fieldId: Int) = delegate.addDynamicPropertyToThing(entityId, relationshipType, propertyId, fieldId)
   override def proposeDataDebit(name: String,
@@ -339,6 +348,11 @@ private abstract class HatClientBase(ning: NingJsonClient, host: String, extraQu
         okayStatusCode = CREATED)
     }
   }
+
+  override def createContextualBundle(name: String, entityId: Int) =
+    post[JsonNode]("bundles/context", Map("name" -> name, "entities" -> Seq(Map("entityId" -> entityId))), okayStatusCode = CREATED)
+
+
 
   override def proposeDataDebit(name: String,
                                 bundle: HatBundleDefinition,

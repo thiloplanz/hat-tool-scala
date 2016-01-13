@@ -292,9 +292,10 @@ object Main {
         }
         val createBundle = new Subcommand("bundle") with Runnable {
           val table = opt[String]()
+          val entity = opt[Int]()
           val name = opt[String](required = true)
 
-          override def run() = dumpJson(dataDict.createContextlessBundle(name(), table()))
+          override def run() = _createBundle(dataDict, name(), table.get, entity.get)
         }
         val createDataRecord = new Subcommand("record") with Runnable {
           val name = opt[String](required = true)
@@ -319,12 +320,10 @@ object Main {
 
         val proposeDataDebit = new Subcommand("dataDebit") with Runnable {
           val table = opt[String]()
+          val entity = opt[Int]()
           val name = opt[String](required = true)
 
-          override def run() = dumpJson(dataDict.getDataTableId(table()).flatMap { id =>
-            client.proposeDataDebit(name(), new HatContextLessBundle(name(), id),
-            startDate = new Date()
-          )})
+          override def run() = _proposeDataDebit(dataDict, name(), table.get, entity.get)
         }
       }
       val enable = new Subcommand("enable") {
@@ -372,6 +371,33 @@ object Main {
     if (fields.isEmpty && !empty) throw new IllegalArgumentException("specify --fields for the record, or use --empty")
     dumpJson(client.createDataRecordWithNamedFields(name, fields))
   }
+
+  private def _createBundle(client: HatDataDictionaryCache, name: String, table: Option[String], entityId: Option[Int] ) = {
+    if (table != None && entityId != None) throw new IllegalArgumentException("cannot include both tables and entities in the same bundle");
+    table match {
+      case Some(t) => dumpJson(client.createContextlessBundle(name, t))
+      case None => entityId match {
+        case Some(e) => dumpJson(client.createContextualBundle(name, e))
+        case None => throw new IllegalArgumentException("specify a table or an entity to create the bundle with")
+      }
+    }
+  }
+
+  private def _proposeDataDebit(client: HatDataDictionaryCache, name: String, table: Option[String], entityId:Option[Int]) = {
+    if (table != None && entityId != None) throw new IllegalArgumentException("cannot include both tables and entities in the same bundle");
+    table match {
+      case Some(t) => dumpJson(client.getDataTableId(t).flatMap { id =>
+        client.proposeDataDebit(name, new HatContextLessBundle(name, id),
+          startDate = new Date()
+        )})
+      case None => entityId match {
+        case Some(e) => dumpJson(client.proposeDataDebit(name, new HatContextualBundle(name, e)))
+        case None => throw new IllegalArgumentException("specify a table or an entity to create the bundle with")
+      }
+    }
+
+  }
+
 
   private def _rawPost(client: HatClient, path: String, fileName: String): Unit = {
     val entity = mapper.readValue[ObjectNode](new File(fileName))
