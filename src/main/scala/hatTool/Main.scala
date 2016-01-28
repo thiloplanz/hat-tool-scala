@@ -25,7 +25,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode
 import com.fasterxml.jackson.databind.{JsonNode, ObjectMapper, SerializationFeature}
 import com.fasterxml.jackson.module.scala.DefaultScalaModule
 import com.fasterxml.jackson.module.scala.experimental.ScalaObjectMapper
-import com.ning.http.client.AsyncHttpClient
+import com.ning.http.client.{AsyncHttpClientConfig, AsyncHttpClient}
 import com.typesafe.config.ConfigFactory
 import org.rogach.scallop.{ScallopConf, Subcommand}
 
@@ -38,10 +38,10 @@ object Main {
   private val config = ConfigFactory.load()
 
   private val host = config.getString("hat.hostUrl")
+  private val sslCert = if (config.hasPath("hat.sslCert")) Some(config.getString("hat.sslCert")) else None
 
   private val owner = config.getString("hat.owner.username")
   private val ownerPassword = config.getString("hat.owner.password")
-
 
   private val timelimit = Duration("10 seconds")
 
@@ -92,7 +92,12 @@ object Main {
 
   def main(args: Array[String]) {
 
-    lazy val ning = new AsyncHttpClient()
+    lazy val ning  = sslCert match {
+      case None => new AsyncHttpClient
+      case Some(cert) => new AsyncHttpClient(new AsyncHttpClientConfig.Builder()
+        .setSSLContext(SSLKeyPinning(cert).makeSSLContext(skipX509ExtendedTrustVerification = true))
+        .build)
+    }
 
     object Args extends ScallopConf(args){
       val accessToken = opt[String]("accessToken")

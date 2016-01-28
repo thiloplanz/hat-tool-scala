@@ -16,5 +16,6 @@ libraryDependencies += "org.slf4j" % "slf4j-api" % "1.7.12"
 libraryDependencies += "org.slf4j" % "slf4j-simple" % "1.7.12" % "runtime,optional"
 
 libraryDependencies += "com.ning" % "async-http-client" % "1.9.21"
+libraryDependencies += "commons-codec" % "commons-codec" % "1.10"
 
 libraryDependencies += "org.specs2" %% "specs2-core" % "3.6.6" % "test"
